@@ -1,0 +1,144 @@
+/* ============================================
+   HelpDesk - Main JavaScript
+   ============================================ */
+
+$(document).ready(function () {
+
+    // Sidebar toggle
+    $('#sidebarToggle').on('click', function () {
+        if ($(window).width() <= 768) {
+            $('#sidebar').toggleClass('show');
+        } else {
+            $('body').toggleClass('sidebar-collapsed');
+            localStorage.setItem('sidebarCollapsed', $('body').hasClass('sidebar-collapsed'));
+        }
+    });
+
+    // Restore sidebar state
+    if (localStorage.getItem('sidebarCollapsed') === 'true' && $(window).width() > 768) {
+        $('body').addClass('sidebar-collapsed');
+    }
+
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(function () {
+        $('.alert-dismissible.auto-dismiss').fadeOut('slow', function () {
+            $(this).remove();
+        });
+    }, 5000);
+
+    // Confirm dialogs
+    $(document).on('click', '[data-confirm]', function (e) {
+        var message = $(this).data('confirm') || 'Sei sicuro di voler procedere?';
+        if (!confirm(message)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    // CSRF token in AJAX headers
+    var csrfToken = $('meta[name="csrf-token"]').attr('content');
+    if (csrfToken) {
+        $.ajaxSetup({
+            headers: { 'X-CSRF-Token': csrfToken }
+        });
+    }
+
+    // Tooltip initialization
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Table row click - navigate to href
+    $(document).on('click', 'tr[data-href]', function () {
+        window.location.href = $(this).data('href');
+    });
+
+    // Filter form auto-submit on select change
+    $('.filter-auto-submit select, .filter-auto-submit input[type="checkbox"]').on('change', function () {
+        $(this).closest('form').submit();
+    });
+
+    // Status update form confirmation
+    $('#statusUpdateForm').on('submit', function (e) {
+        var newStatus = $(this).find('[name="status"]').val();
+        var statusLabels = {
+            'open': 'Aperto',
+            'in_progress': 'In Lavorazione',
+            'waiting': 'In Attesa',
+            'resolved': 'Risolto',
+            'closed': 'Chiuso'
+        };
+        var label = statusLabels[newStatus] || newStatus;
+        if (!confirm('Confermi il cambio di stato a: ' + label + '?')) {
+            e.preventDefault();
+        }
+    });
+
+    // Part request quantity validation
+    $('input[name="quantity"]').on('input', function () {
+        var val = parseInt($(this).val());
+        var max = parseInt($(this).attr('max'));
+        if (val < 1) $(this).val(1);
+        if (max && val > max) $(this).val(max);
+    });
+
+    // Character counter for textareas
+    $('textarea[maxlength]').each(function () {
+        var max = $(this).attr('maxlength');
+        var counter = $('<small class="text-muted char-counter"></small>');
+        $(this).after(counter);
+        var update = function () {
+            var remaining = max - $(this).val().length;
+            counter.text(remaining + ' caratteri rimanenti');
+            counter.toggleClass('text-danger', remaining < 50);
+        }.bind(this);
+        $(this).on('input', update);
+        update();
+    });
+
+    // Module toggle via AJAX in settings
+    $(document).on('change', '.module-toggle', function () {
+        var slug = $(this).data('slug');
+        var enabled = $(this).is(':checked') ? 1 : 0;
+        var csrfVal = $('input[name="csrf_token"]').first().val();
+        $.post(window.appUrl + '/modules/settings/index.php', {
+            action: 'toggle_module',
+            slug: slug,
+            enabled: enabled,
+            csrf_token: csrfVal
+        }).done(function (resp) {
+            var data = typeof resp === 'string' ? JSON.parse(resp) : resp;
+            if (!data.success) {
+                alert('Errore durante il salvataggio.');
+            }
+        }).fail(function () {
+            alert('Errore di comunicazione con il server.');
+        });
+    });
+
+    // Install wizard step navigation
+    var currentStep = 1;
+    var totalSteps = 5;
+
+    window.goToStep = function (step) {
+        if (step < 1 || step > totalSteps) return;
+        $('.wizard-step').removeClass('active');
+        $('#step-' + step).addClass('active');
+        $('.step-indicator .step').each(function (i) {
+            var n = i + 1;
+            $(this).removeClass('active completed');
+            if (n < step) $(this).addClass('completed');
+            if (n === step) $(this).addClass('active');
+        });
+        currentStep = step;
+    };
+
+    // Smooth scroll to top on page load errors
+    if ($('.alert-danger').length) {
+        $('html, body').animate({ scrollTop: 0 }, 400);
+    }
+});
+
+// App URL global (set in PHP pages)
+window.appUrl = window.appUrl || '';
