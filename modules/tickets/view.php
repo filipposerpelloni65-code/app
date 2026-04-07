@@ -151,9 +151,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Fetch componenti for this ticket
-$componenti = $db->prepare("SELECT tc.*, mc.nome AS modello_nome, mc.marca AS modello_marca, u.full_name AS aggiunto_da FROM ticket_componenti tc JOIN modelli_componenti mc ON tc.modello_id=mc.id JOIN users u ON tc.created_by=u.id WHERE tc.ticket_id=? ORDER BY tc.created_at ASC");
-$componenti->execute([$id]);
-$componenti = $componenti->fetchAll();
+$componentiStmt = $db->prepare("SELECT tc.*, mc.nome AS modello_nome, mc.marca AS modello_marca, u.full_name AS aggiunto_da FROM ticket_componenti tc JOIN modelli_componenti mc ON tc.modello_id=mc.id JOIN users u ON tc.created_by=u.id WHERE tc.ticket_id=? ORDER BY tc.created_at ASC");
+$componentiStmt->execute([$id]);
+$componenti = $componentiStmt->fetchAll();
 
 // Modelli for add-form
 $modelliDisponibili = $db->query("SELECT id, tipo, nome, marca FROM modelli_componenti WHERE active=1 ORDER BY tipo, nome")->fetchAll();

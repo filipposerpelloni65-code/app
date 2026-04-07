@@ -82,7 +82,7 @@ include APP_ROOT . '/includes/header.php';
     </div>
     <div class="mb-4">
         <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="active" id="active" <?= ($_POST['active'] ?? '1') ? 'checked' : '' ?>>
+            <input class="form-check-input" type="checkbox" name="active" id="active" <?= (!isset($_POST['active']) || $_POST['active']) ? 'checked' : '' ?>>
             <label class="form-check-label" for="active">Modello attivo (disponibile per la selezione nei ticket)</label>
         </div>
     </div>
