@@ -57,24 +57,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $customer_name    = trim($_POST['customer_name'] ?? '');
     $customer_contact = trim($_POST['customer_contact'] ?? '');
     $notes            = trim($_POST['notes'] ?? '');
+    $tipo_intervento  = trim($_POST['tipo_intervento'] ?? '') ?: null;
+    $ora_inizio       = trim($_POST['ora_inizio'] ?? '') ?: null;
+    $ora_fine         = trim($_POST['ora_fine'] ?? '') ?: null;
+    $ore_lavorate     = strlen(trim($_POST['ore_lavorate'] ?? '')) ? (float)str_replace(',', '.', $_POST['ore_lavorate']) : null;
 
     if (!$title)             $errors[] = 'Il titolo è obbligatorio.';
     if (!$work_description)  $errors[] = 'La descrizione del lavoro è obbligatoria.';
     if (!$intervention_date) $errors[] = 'La data di intervento è obbligatoria.';
     if (!$technician_id)     $errors[] = 'Il tecnico è obbligatorio.';
+    if ($ore_lavorate !== null && ($ore_lavorate < 0 || $ore_lavorate > 999)) $errors[] = 'Ore lavorate non valide.';
 
     if (!$errors) {
         $stmt = $db->prepare("
             UPDATE rapportini SET
                 title=?, work_description=?, parts_used=?, intervention_date=?,
                 technician_id=?, ticket_id=?, dealer_id=?, location_id=?, periferica_id=?,
-                customer_name=?, customer_contact=?, notes=?, updated_at=NOW()
+                customer_name=?, customer_contact=?, notes=?,
+                tipo_intervento=?, ora_inizio=?, ora_fine=?, ore_lavorate=?,
+                updated_at=NOW()
             WHERE id=? AND status='draft'
         ");
         $stmt->execute([
             $title, $work_description, $parts_used, $intervention_date,
             $technician_id, $ticket_id, $dealer_id, $location_id, $periferica_id,
-            $customer_name, $customer_contact, $notes, $id
+            $customer_name, $customer_contact, $notes,
+            $tipo_intervento, $ora_inizio, $ora_fine, $ore_lavorate,
+            $id
         ]);
         // Sync periferica back-link
         if ($periferica_id) {
@@ -158,6 +167,34 @@ include APP_ROOT . '/includes/header.php';
                 <option value="<?= $t['id'] ?>" <?= (($rapportino['ticket_id'] ?? '') == $t['id']) ? 'selected' : '' ?>><?= h(getTicketPrefix().'-'.str_pad($t['id'],4,'0',STR_PAD_LEFT).' - '.$t['title']) ?></option>
                 <?php endforeach; ?>
             </select>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Tipo Intervento</label>
+            <select name="tipo_intervento" class="form-select">
+                <option value="">-- Non specificato --</option>
+                <?php $tipi = ['In loco'=>'In loco','Remoto'=>'Remoto','In laboratorio'=>'In laboratorio','Garanzia'=>'Garanzia','A pagamento'=>'A pagamento','Contratto'=>'Contratto']; ?>
+                <?php foreach ($tipi as $v => $l): ?>
+                <option value="<?= h($v) ?>" <?= ($rapportino['tipo_intervento'] ?? '') === $v ? 'selected' : '' ?>><?= h($l) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold">Ora Inizio</label>
+            <input type="time" name="ora_inizio" class="form-control" value="<?= h(substr($rapportino['ora_inizio'] ?? '', 0, 5)) ?>">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold">Ora Fine</label>
+            <input type="time" name="ora_fine" class="form-control" value="<?= h(substr($rapportino['ora_fine'] ?? '', 0, 5)) ?>">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Ore Lavorate</label>
+            <div class="input-group">
+                <input type="number" name="ore_lavorate" class="form-control" min="0" max="999" step="0.25" placeholder="Es. 2.5" value="<?= h($rapportino['ore_lavorate'] ?? '') ?>">
+                <span class="input-group-text">h</span>
+            </div>
         </div>
     </div>
 

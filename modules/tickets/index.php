@@ -28,6 +28,9 @@ if (!empty($_GET['category_id'])) { $where[] = 't.category_id=?'; $params[] = (i
 if (!empty($_GET['dealer_id'])) { $where[] = 't.dealer_id=?'; $params[] = (int)$_GET['dealer_id']; }
 if (!empty($_GET['location_id'])) { $where[] = 't.location_id=?'; $params[] = (int)$_GET['location_id']; }
 if (!empty($_GET['q'])) { $where[] = '(t.title LIKE ? OR t.description LIKE ?)'; $params[] = '%'.$_GET['q'].'%'; $params[] = '%'.$_GET['q'].'%'; }
+if (!empty($_GET['date_from'])) { $where[] = 'DATE(t.created_at)>=?'; $params[] = $_GET['date_from']; }
+if (!empty($_GET['date_to']))   { $where[] = 'DATE(t.created_at)<=?'; $params[] = $_GET['date_to']; }
+if (!empty($_GET['overdue']))   { $where[] = "t.due_date < CURDATE() AND t.status NOT IN ('resolved','closed')"; }
 if ($user['role'] === 'user') { $where[] = 't.created_by=?'; $params[] = $user['id']; }
 
 $whereStr = implode(' AND ', $where);
@@ -62,8 +65,8 @@ include APP_ROOT . '/includes/header.php';
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-2">
-            <div class="col-md-4">
-                <input type="text" name="q" class="form-control" placeholder="Cerca per titolo..." value="<?= h($_GET['q'] ?? '') ?>">
+            <div class="col-md-3">
+                <input type="text" name="q" class="form-control" placeholder="Cerca per titolo o descrizione..." value="<?= h($_GET['q'] ?? '') ?>">
             </div>
             <div class="col-md-2">
                 <select name="status" class="form-select">
@@ -92,17 +95,39 @@ include APP_ROOT . '/includes/header.php';
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-2 d-flex gap-1">
+            <?php if (isTechnician()): ?>
+            <div class="col-md-2">
+                <select name="assigned_to" class="form-select">
+                    <option value="">Tutti i tecnici</option>
+                    <?php foreach ($technicians as $tech): ?>
+                    <option value="<?= $tech['id'] ?>" <?= ($_GET['assigned_to'] ?? '') == $tech['id'] ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
+            <div class="col-md-1 d-flex gap-1">
                 <button type="submit" class="btn btn-outline-primary flex-fill"><i class="bi bi-search"></i></button>
                 <a href="?" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
             </div>
         </form>
-        <?php if ($dealers): ?>
         <form method="get" class="row g-2 mt-1">
-            <?php foreach (['status','priority','category_id','assigned_to','q'] as $k): ?>
+            <?php foreach (['status','priority','category_id','assigned_to','q','dealer_id','location_id'] as $k): ?>
             <?php if (!empty($_GET[$k])): ?><input type="hidden" name="<?= h($k) ?>" value="<?= h($_GET[$k]) ?>"><?php endif; ?>
             <?php endforeach; ?>
-            <div class="col-md-4">
+            <div class="col-md-2">
+                <input type="date" name="date_from" class="form-control form-control-sm" placeholder="Da data" title="Creato dal" value="<?= h($_GET['date_from'] ?? '') ?>">
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="date_to" class="form-control form-control-sm" placeholder="A data" title="Creato al" value="<?= h($_GET['date_to'] ?? '') ?>">
+            </div>
+            <div class="col-md-3">
+                <div class="form-check mt-1">
+                    <input type="checkbox" name="overdue" value="1" id="filterOverdue" class="form-check-input" <?= !empty($_GET['overdue']) ? 'checked' : '' ?> onchange="this.form.submit()">
+                    <label for="filterOverdue" class="form-check-label small text-danger fw-semibold"><i class="bi bi-alarm me-1"></i>Solo scaduti</label>
+                </div>
+            </div>
+            <?php if ($dealers): ?>
+            <div class="col-md-3">
                 <select name="dealer_id" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">Tutti i concessionari</option>
                     <?php foreach ($dealers as $d): ?>
@@ -111,7 +136,7 @@ include APP_ROOT . '/includes/header.php';
                 </select>
             </div>
             <?php if ($dealerLocations): ?>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <select name="location_id" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">Tutti i punti vendita</option>
                     <?php foreach ($dealerLocations as $dl): ?>
@@ -120,8 +145,11 @@ include APP_ROOT . '/includes/header.php';
                 </select>
             </div>
             <?php endif; ?>
+            <?php endif; ?>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Applica</button>
+            </div>
         </form>
-        <?php endif; ?>
     </div>
 </div>
 
@@ -137,8 +165,8 @@ include APP_ROOT . '/includes/header.php';
                         <th>Stato</th>
                         <th>Priorità</th>
                         <th>Assegnato a</th>
-                        <th>Creato da</th>
                         <th>Concessionario</th>
+                        <th>Scadenza</th>
                         <th>Data</th>
                         <th></th>
                     </tr>
@@ -153,8 +181,17 @@ include APP_ROOT . '/includes/header.php';
                         <td><?= getStatusBadge($t['status']) ?></td>
                         <td><?= getPriorityBadge($t['priority']) ?></td>
                         <td class="small"><?= $t['assignee_name'] ? h($t['assignee_name']) : '<span class="text-muted">Non assegnato</span>' ?></td>
-                        <td class="small"><?= h($t['creator_name'] ?? '') ?></td>
                         <td class="small"><?= $t['dealer_name'] ? '<a href="'.APP_URL.'/modules/dealers/view.php?id='.$t['dealer_id'].'" class="text-decoration-none">'.h($t['dealer_name']).'</a>' : '<span class="text-muted">-</span>' ?></td>
+                        <?php
+                            $dueBadge = '';
+                            if ($t['due_date'] && !in_array($t['status'], ['resolved','closed'])) {
+                                $daysLeft = (int)((strtotime($t['due_date']) - time()) / 86400);
+                                if ($daysLeft < 0) $dueBadge = '<span class="badge bg-danger">Scaduto</span>';
+                                elseif ($daysLeft === 0) $dueBadge = '<span class="badge bg-warning text-dark">Oggi</span>';
+                                elseif ($daysLeft <= 3) $dueBadge = '<span class="badge bg-warning text-dark">'.$daysLeft.'gg</span>';
+                            }
+                        ?>
+                        <td class="small text-nowrap"><?= $t['due_date'] ? formatDate($t['due_date'], 'd/m/Y').' '.$dueBadge : '<span class="text-muted">-</span>' ?></td>
                         <td class="small text-muted"><?= formatDate($t['created_at'], 'd/m/Y') ?></td>
                         <td>
                             <div class="btn-group btn-group-sm">

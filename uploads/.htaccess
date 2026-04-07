@@ -1,0 +1,5 @@
+# Allow only safe file types to be served
+<FilesMatch "\.(php|php3|php4|php5|phtml|cgi|pl|py|rb|sh)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

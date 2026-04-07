@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $priority = $_POST['priority'] ?? 'medium';
+    $due_date = trim($_POST['due_date'] ?? '') ?: null;
     $category_id = (int)($_POST['category_id'] ?? 0) ?: null;
     $assigned_to = (int)($_POST['assigned_to'] ?? 0) ?: null;
     $dealer_id = (int)($_POST['dealer_id'] ?? 0) ?: null;
@@ -33,10 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!$description) $errors[] = 'La descrizione è obbligatoria.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
+    if ($due_date && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $due_date)) { $errors[] = 'Data scadenza non valida.'; $due_date = null; }
 
     if (!$errors) {
-        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, status) VALUES (?,?,?,?,?,?,?,?,?,'open')");
-        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario]);
+        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, due_date, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, status) VALUES (?,?,?,?,?,?,?,?,?,?,'open')");
+        $stmt->execute([$title, $description, $priority, $due_date, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario]);
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'create', 'ticket', $newId, "Creato ticket: $title");
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $newId . '&created=1');
@@ -107,6 +109,10 @@ include APP_ROOT . '/includes/header.php';
                 <option value="<?= $cat['id'] ?>" <?= ($_POST['category_id'] ?? '') == $cat['id'] ? 'selected' : '' ?>><?= h($cat['name']) ?></option>
                 <?php endforeach; ?>
             </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Data Scadenza</label>
+            <input type="date" name="due_date" class="form-control" value="<?= h($_POST['due_date'] ?? '') ?>">
         </div>
         <?php if (isTechnician()): ?>
         <div class="col-md-4">

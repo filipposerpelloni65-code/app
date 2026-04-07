@@ -26,25 +26,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = trim($_POST['description'] ?? '');
     $status = $_POST['status'] ?? 'open';
     $priority = $_POST['priority'] ?? 'medium';
+    $due_date = trim($_POST['due_date'] ?? '') ?: null;
     $category_id = (int)($_POST['category_id'] ?? 0) ?: null;
     $assigned_to = (int)($_POST['assigned_to'] ?? 0) ?: null;
+    $dealer_id = (int)($_POST['dealer_id'] ?? 0) ?: null;
+    $location_id = (int)($_POST['location_id'] ?? 0) ?: null;
     $codice_concessionario = trim($_POST['codice_concessionario'] ?? '') ?: null;
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!in_array($status, ['open','in_progress','waiting','resolved','closed'])) $errors[] = 'Stato non valido.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
+    if ($due_date && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $due_date)) { $errors[] = 'Data scadenza non valida.'; $due_date = null; }
     if (!$errors) {
         $closedAt = in_array($status, ['resolved','closed']) && !$ticket['closed_at'] ? ', closed_at=NOW()' : '';
-        $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, category_id=?, assigned_to=?, codice_concessionario=?, updated_at=NOW()$closedAt WHERE id=?");
-        $stmt->execute([$title, $description, $status, $priority, $category_id, $assigned_to, $codice_concessionario, $id]);
+        $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, due_date=?, category_id=?, assigned_to=?, dealer_id=?, location_id=?, codice_concessionario=?, updated_at=NOW()$closedAt WHERE id=?");
+        $stmt->execute([$title, $description, $status, $priority, $due_date, $category_id, $assigned_to, $dealer_id, $location_id, $codice_concessionario, $id]);
         logActivity($user['id'], 'edit', 'ticket', $id, "Modificato ticket: $title");
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '&updated=1');
         exit;
     }
-    $ticket = array_merge($ticket, ['title'=>$title,'description'=>$description,'status'=>$status,'priority'=>$priority,'category_id'=>$category_id,'assigned_to'=>$assigned_to,'codice_concessionario'=>$codice_concessionario]);
+    $ticket = array_merge($ticket, ['title'=>$title,'description'=>$description,'status'=>$status,'priority'=>$priority,'due_date'=>$due_date,'category_id'=>$category_id,'assigned_to'=>$assigned_to,'dealer_id'=>$dealer_id,'location_id'=>$location_id,'codice_concessionario'=>$codice_concessionario]);
 }
 
 $categories = $db->query("SELECT * FROM ticket_categories ORDER BY name")->fetchAll();
 $technicians = $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll();
+$dealers = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
+$selectedDealer = (int)($_POST['dealer_id'] ?? $ticket['dealer_id'] ?? 0);
+$dealerLocations = [];
+if ($selectedDealer) {
+    $dlStmt = $db->prepare("SELECT id, name FROM dealer_locations WHERE dealer_id=? AND active=1 ORDER BY name");
+    $dlStmt->execute([$selectedDealer]);
+    $dealerLocations = $dlStmt->fetchAll();
+}
 
 define('PAGE_TITLE', 'Modifica Ticket');
 define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Ticket' => APP_URL.'/modules/tickets/index.php', 'Modifica' => '']);
@@ -118,6 +130,34 @@ include APP_ROOT . '/includes/header.php';
                 <?php endforeach; ?>
             </select>
         </div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Data Scadenza</label>
+            <input type="date" name="due_date" class="form-control" value="<?= h($ticket['due_date'] ?? '') ?>">
+        </div>
+        <?php if ($dealers): ?>
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Concessionario</label>
+            <select name="dealer_id" class="form-select" onchange="this.form.submit()">
+                <option value="">-- Nessun concessionario --</option>
+                <?php foreach ($dealers as $d): ?>
+                <option value="<?= $d['id'] ?>" <?= $selectedDealer == $d['id'] ? 'selected' : '' ?>><?= h($d['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php if ($dealerLocations): ?>
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Punto Vendita</label>
+            <select name="location_id" class="form-select">
+                <option value="">-- Nessun punto vendita --</option>
+                <?php foreach ($dealerLocations as $dl): ?>
+                <option value="<?= $dl['id'] ?>" <?= $ticket['location_id'] == $dl['id'] ? 'selected' : '' ?>><?= h($dl['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
     </div>
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salva Modifiche</button>

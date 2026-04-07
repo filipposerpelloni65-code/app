@@ -98,6 +98,64 @@ $uscite = $db->prepare("SELECT tu.*, u.full_name AS tecnico_name FROM ticket_usc
 $uscite->execute([$id]);
 $uscite = $uscite->fetchAll();
 
+// Handle file attachment upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_attachment' && isTechnician()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
+    if (!$errors && isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['attachment'];
+        $allowedMime = ['image/jpeg','image/png','image/gif','image/webp','application/pdf',
+            'application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain','text/csv'];
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($file['tmp_name']);
+        if (!in_array($mime, $allowedMime)) {
+            $errors[] = 'Tipo di file non consentito.';
+        } elseif ($file['size'] > 10 * 1024 * 1024) {
+            $errors[] = 'Il file supera il limite di 10 MB.';
+        } else {
+            $uploadDir = APP_ROOT . '/uploads/tickets/' . $id . '/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $safeName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', pathinfo($file['name'], PATHINFO_FILENAME));
+            $filename = $safeName . '_' . time() . '.' . $ext;
+            $destPath = $uploadDir . $filename;
+            if (move_uploaded_file($file['tmp_name'], $destPath)) {
+                $relPath = 'uploads/tickets/' . $id . '/' . $filename;
+                $db->prepare("INSERT INTO ticket_attachments (ticket_id, filename, filepath, filesize, mimetype, uploaded_by) VALUES (?,?,?,?,?,?)")
+                   ->execute([$id, basename($file['name']), $relPath, $file['size'], $mime, $user['id']]);
+                $db->prepare("UPDATE tickets SET updated_at=NOW() WHERE id=?")->execute([$id]);
+                logActivity($user['id'], 'upload_attachment', 'ticket', $id, 'Allegato caricato: ' . basename($file['name']));
+                header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#attachments');
+                exit;
+            } else {
+                $errors[] = 'Errore durante il caricamento del file.';
+            }
+        }
+    } elseif (!$errors) {
+        $errors[] = 'Nessun file selezionato o errore di upload.';
+    }
+}
+
+// Handle file attachment delete
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_attachment' && isTechnician()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
+    $attId = (int)($_POST['attachment_id'] ?? 0);
+    if ($attId && !$errors) {
+        $att = $db->prepare("SELECT * FROM ticket_attachments WHERE id=? AND ticket_id=?");
+        $att->execute([$attId, $id]);
+        $att = $att->fetch();
+        if ($att) {
+            $filePath = APP_ROOT . '/' . $att['filepath'];
+            if (file_exists($filePath)) @unlink($filePath);
+            $db->prepare("DELETE FROM ticket_attachments WHERE id=?")->execute([$attId]);
+            logActivity($user['id'], 'delete_attachment', 'ticket', $id, 'Allegato eliminato: ' . $att['filename']);
+        }
+        header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#attachments');
+        exit;
+    }
+}
+
 // Fetch periferiche linked to this ticket
 $perifericheLinked = [];
 if (isModuleEnabled('periferiche')) {
@@ -105,6 +163,19 @@ if (isModuleEnabled('periferiche')) {
     $pgStmt->execute([$id]);
     $perifericheLinked = $pgStmt->fetchAll();
 }
+
+// Fetch rapportini linked to this ticket
+$linkedRapportini = [];
+if (isModuleEnabled('rapportini')) {
+    $rapStmt = $db->prepare("SELECT r.*, ut.full_name AS technician_name FROM rapportini r LEFT JOIN users ut ON r.technician_id=ut.id WHERE r.ticket_id=? ORDER BY r.created_at DESC");
+    $rapStmt->execute([$id]);
+    $linkedRapportini = $rapStmt->fetchAll();
+}
+
+// Fetch attachments
+$attachments = $db->prepare("SELECT ta.*, u.full_name AS uploader_name FROM ticket_attachments ta LEFT JOIN users u ON ta.uploaded_by=u.id WHERE ta.ticket_id=? ORDER BY ta.created_at DESC");
+$attachments->execute([$id]);
+$attachments = $attachments->fetchAll();
 
 define('PAGE_TITLE', 'Ticket ' . getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT));
 define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Ticket' => APP_URL.'/modules/tickets/index.php', 'Dettaglio' => '']);
@@ -115,6 +186,12 @@ include APP_ROOT . '/includes/header.php';
 <?php if (isset($_GET['created'])): ?>
 <div class="alert alert-success alert-dismissible fade show" role="alert">
     <i class="bi bi-check-circle me-2"></i>Ticket creato con successo!
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php endif; ?>
+<?php if (isset($_GET['updated'])): ?>
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle me-2"></i>Ticket aggiornato con successo!
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 <?php endif; ?>
@@ -255,6 +332,86 @@ include APP_ROOT . '/includes/header.php';
         </div>
         <?php endif; ?>
 
+        <!-- Rapportini Collegati -->
+        <?php if (isModuleEnabled('rapportini') && ($linkedRapportini || isTechnician())): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Rapportini (<?= count($linkedRapportini) ?>)</h6>
+                <?php if (isTechnician()): ?>
+                <a href="<?= APP_URL ?>/modules/rapportini/create.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg me-1"></i>Nuovo</a>
+                <?php endif; ?>
+            </div>
+            <?php if ($linkedRapportini): ?>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>#</th><th>Tecnico</th><th>Data</th><th>Stato</th><th></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($linkedRapportini as $rap): ?>
+                    <tr>
+                        <td><a href="<?= APP_URL ?>/modules/rapportini/view.php?id=<?= $rap['id'] ?>" class="fw-bold text-primary text-decoration-none small">RAP-<?= str_pad($rap['id'], 4, '0', STR_PAD_LEFT) ?></a></td>
+                        <td class="small"><?= h($rap['title']) ?></td>
+                        <td class="small text-muted"><?= formatDate($rap['intervention_date'], 'd/m/Y') ?></td>
+                        <td><?= getRapportinoStatusBadge($rap['status']) ?></td>
+                        <td><a href="<?= APP_URL ?>/modules/rapportini/view.php?id=<?= $rap['id'] ?>" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="card-body text-center text-muted small py-3">Nessun rapportino per questo ticket.</div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- Allegati -->
+        <div class="card border-0 shadow-sm mb-4" id="attachments">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-paperclip me-2"></i>Allegati (<?= count($attachments) ?>)</h6>
+            </div>
+            <?php if ($attachments): ?>
+            <div class="list-group list-group-flush">
+                <?php foreach ($attachments as $att): ?>
+                <?php
+                    $iconMap = ['image/jpeg'=>'bi-image','image/png'=>'bi-image','image/gif'=>'bi-image',
+                        'image/webp'=>'bi-image','application/pdf'=>'bi-file-pdf text-danger',
+                        'text/plain'=>'bi-file-text','text/csv'=>'bi-file-spreadsheet'];
+                    $icon = $iconMap[$att['mimetype'] ?? ''] ?? 'bi-file-earmark';
+                    $sizeStr = $att['filesize'] ? (round($att['filesize']/1024,1) . ' KB') : '';
+                ?>
+                <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi <?= $icon ?> fs-5 text-primary"></i>
+                        <div>
+                            <a href="<?= APP_URL ?>/modules/tickets/download.php?id=<?= $att['id'] ?>" target="_blank" class="text-decoration-none small fw-semibold"><?= h($att['filename']) ?></a>
+                            <div class="text-muted" style="font-size:.75rem"><?= h($att['uploader_name'] ?? '') ?> · <?= formatDate($att['created_at'], 'd/m/Y H:i') ?><?= $sizeStr ? ' · '.$sizeStr : '' ?></div>
+                        </div>
+                    </div>
+                    <?php if (isTechnician()): ?>
+                    <form method="post" onsubmit="return confirm('Eliminare questo allegato?')">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="delete_attachment">
+                        <input type="hidden" name="attachment_id" value="<?= $att['id'] ?>">
+                        <button type="submit" class="btn btn-outline-danger btn-sm py-0"><i class="bi bi-trash"></i></button>
+                    </form>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <?php if (isTechnician() && !in_array($ticket['status'], ['closed'])): ?>
+            <div class="card-footer bg-white">
+                <form method="post" enctype="multipart/form-data" class="d-flex gap-2">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="upload_attachment">
+                    <input type="file" name="attachment" class="form-control form-control-sm flex-fill" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp">
+                    <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-upload me-1"></i>Carica</button>
+                </form>
+                <div class="form-text mt-1">Max 10 MB. Formati: PDF, Word, Excel, immagini, testo.</div>
+            </div>
+            <?php endif; ?>
+        </div>
+
         <!-- Spare Parts Requests -->
         <?php if ($partsRequests): ?>
         <div class="card border-0 shadow-sm mb-4">
@@ -325,6 +482,27 @@ include APP_ROOT . '/includes/header.php';
                     <dt class="col-sm-5">Stato</dt><dd class="col-sm-7"><?= getStatusBadge($ticket['status']) ?></dd>
                     <dt class="col-sm-5">Priorità</dt><dd class="col-sm-7"><?= getPriorityBadge($ticket['priority']) ?></dd>
                     <dt class="col-sm-5">Categoria</dt><dd class="col-sm-7"><?= $ticket['category_name'] ? h($ticket['category_name']) : '-' ?></dd>
+                    <?php if (!empty($ticket['due_date'])): ?>
+                    <?php
+                        $dueTs = strtotime($ticket['due_date']);
+                        $daysLeft = (int)(($dueTs - time()) / 86400);
+                        $dueCls = '';
+                        if (!in_array($ticket['status'], ['resolved','closed'])) {
+                            if ($daysLeft < 0) $dueCls = 'text-danger fw-bold';
+                            elseif ($daysLeft <= 3) $dueCls = 'text-warning fw-bold';
+                        }
+                    ?>
+                    <dt class="col-sm-5">Scadenza</dt>
+                    <dd class="col-sm-7 <?= $dueCls ?>">
+                        <?= formatDate($ticket['due_date'], 'd/m/Y') ?>
+                        <?php if (!in_array($ticket['status'], ['resolved','closed'])): ?>
+                            <?php if ($daysLeft < 0): ?><span class="badge bg-danger ms-1">Scaduto</span>
+                            <?php elseif ($daysLeft === 0): ?><span class="badge bg-warning text-dark ms-1">Oggi</span>
+                            <?php elseif ($daysLeft <= 3): ?><span class="badge bg-warning text-dark ms-1"><?= $daysLeft ?>gg</span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </dd>
+                    <?php endif; ?>
                     <?php if (!empty($ticket['codice_concessionario'])): ?>
                     <dt class="col-sm-5">Rif. Concessionario</dt><dd class="col-sm-7 font-monospace"><?= h($ticket['codice_concessionario']) ?></dd>
                     <?php endif; ?>
@@ -368,6 +546,9 @@ include APP_ROOT . '/includes/header.php';
             <div class="card-body d-grid gap-2">
                 <a href="<?= APP_URL ?>/modules/spare_parts/request.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-tools me-1"></i>Richiedi Parte</a>
                 <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica Ticket</a>
+                <?php if (isModuleEnabled('rapportini')): ?>
+                <a href="<?= APP_URL ?>/modules/rapportini/create.php?ticket_id=<?= $id ?><?= $ticket['dealer_id'] ? '&dealer_id='.$ticket['dealer_id'] : '' ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-plus me-1"></i>Nuovo Rapportino</a>
+                <?php endif; ?>
             </div>
         </div>
         <?php endif; ?>

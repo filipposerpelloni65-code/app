@@ -67,8 +67,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'archi
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido. Riprova.'; }
     if (!$errors && $r['status'] === 'signed') {
         $db->prepare("UPDATE rapportini SET status='archived', updated_at=NOW() WHERE id=?")->execute([$id]);
+        // Auto-update linked periferica to 'riparata' if still in repairable state
+        if ($r['periferica_id']) {
+            $db->prepare("UPDATE periferiche_guaste SET stato='riparata', updated_at=NOW() WHERE id=? AND stato IN ('in_riparazione','in_diagnosi','in_giacenza')")
+               ->execute([$r['periferica_id']]);
+        }
         logActivity($user['id'], 'archive', 'rapportino', $id, 'Rapportino archiviato');
         header('Location: ' . APP_URL . '/modules/rapportini/view.php?id=' . $id . '&archived=1');
+        exit;
+    }
+}
+
+// Handle delete action (draft only)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete' && isTechnician()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido. Riprova.'; }
+    if (!$errors && $r['status'] === 'draft') {
+        // Unlink periferica if linked
+        if ($r['periferica_id']) {
+            $db->prepare("UPDATE periferiche_guaste SET rapportino_id=NULL, updated_at=NOW() WHERE id=? AND rapportino_id=?")
+               ->execute([$r['periferica_id'], $id]);
+        }
+        $db->prepare("DELETE FROM rapportini WHERE id=? AND status='draft'")->execute([$id]);
+        logActivity($user['id'], 'delete', 'rapportino', $id, 'Rapportino eliminato');
+        header('Location: ' . APP_URL . '/modules/rapportini/index.php?deleted=1');
         exit;
     }
 }
@@ -210,7 +231,16 @@ include APP_ROOT . '/includes/header.php';
                 <table class="info-table table table-sm table-bordered">
                     <tbody>
                         <tr><td class="fw-semibold bg-light" style="width:35%">Data Intervento</td><td><?= formatDate($r['intervention_date'], 'd/m/Y') ?></td></tr>
+                        <?php if ($r['tipo_intervento']): ?>
+                        <tr><td class="fw-semibold bg-light">Tipo Intervento</td><td><?= h($r['tipo_intervento']) ?></td></tr>
+                        <?php endif; ?>
                         <tr><td class="fw-semibold bg-light">Tecnico</td><td><?= h($r['technician_name'] ?? '-') ?></td></tr>
+                        <?php if ($r['ora_inizio'] || $r['ora_fine']): ?>
+                        <tr><td class="fw-semibold bg-light">Orario</td><td><?= $r['ora_inizio'] ? h(substr($r['ora_inizio'],0,5)) : '-' ?> – <?= $r['ora_fine'] ? h(substr($r['ora_fine'],0,5)) : '-' ?></td></tr>
+                        <?php endif; ?>
+                        <?php if ($r['ore_lavorate'] !== null && $r['ore_lavorate'] !== ''): ?>
+                        <tr><td class="fw-semibold bg-light">Ore Lavorate</td><td><?= number_format((float)$r['ore_lavorate'], 2, ',', '') ?> h</td></tr>
+                        <?php endif; ?>
                         <?php if ($r['customer_name']): ?>
                         <tr><td class="fw-semibold bg-light">Cliente / Referente</td><td><?= h($r['customer_name']) ?></td></tr>
                         <?php endif; ?>
@@ -345,6 +375,21 @@ include APP_ROOT . '/includes/header.php';
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="archive">
                     <button type="submit" class="btn btn-outline-secondary w-100" onclick="return confirm('Archiviare il rapportino? Questa azione non può essere annullata.')"><i class="bi bi-archive me-1"></i>Archivia</button>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Delete action (draft only, technician) -->
+        <?php if ($r['status'] === 'draft' && isTechnician()): ?>
+        <div class="card border-0 shadow-sm mb-3 border-danger">
+            <div class="card-header bg-white"><h6 class="mb-0 text-danger"><i class="bi bi-trash me-1"></i>Elimina Rapportino</h6></div>
+            <div class="card-body">
+                <p class="small text-muted">Elimina definitivamente questo rapportino in bozza.</p>
+                <form method="post">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="delete">
+                    <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Eliminare definitivamente questo rapportino? Questa azione non può essere annullata.')"><i class="bi bi-trash me-1"></i>Elimina</button>
                 </form>
             </div>
         </div>

@@ -22,6 +22,9 @@ $where = ['1=1'];
 $params = [];
 
 if (!empty($_GET['status'])) { $where[] = 'r.status=?'; $params[] = $_GET['status']; }
+if (!empty($_GET['dealer_id'])) { $where[] = 'r.dealer_id=?'; $params[] = (int)$_GET['dealer_id']; }
+if (!empty($_GET['date_from'])) { $where[] = 'r.intervention_date>=?'; $params[] = $_GET['date_from']; }
+if (!empty($_GET['date_to']))   { $where[] = 'r.intervention_date<=?'; $params[] = $_GET['date_to']; }
 if (!empty($_GET['q'])) {
     $q = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $_GET['q']);
     $where[] = '(r.title LIKE ? OR r.work_description LIKE ?)';
@@ -57,6 +60,7 @@ $stmt->execute($params);
 $rapportini = $stmt->fetchAll();
 
 $technicians = $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll();
+$dealers = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
 
 include APP_ROOT . '/includes/header.php';
 ?>
@@ -68,11 +72,15 @@ include APP_ROOT . '/includes/header.php';
     <?php endif; ?>
 </div>
 
+<?php if (isset($_GET['deleted'])): ?>
+<div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle me-2"></i>Rapportino eliminato con successo.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+<?php endif; ?>
+
 <!-- Filters -->
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-2">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <input type="text" name="q" class="form-control" placeholder="Cerca per titolo o descrizione..." value="<?= h($_GET['q'] ?? '') ?>">
             </div>
             <div class="col-md-2">
@@ -84,7 +92,7 @@ include APP_ROOT . '/includes/header.php';
                 </select>
             </div>
             <?php if (isTechnician()): ?>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select name="technician_id" class="form-select">
                     <option value="">Tutti i tecnici</option>
                     <?php foreach ($technicians as $tech): ?>
@@ -92,8 +100,24 @@ include APP_ROOT . '/includes/header.php';
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php if ($dealers): ?>
+            <div class="col-md-2">
+                <select name="dealer_id" class="form-select">
+                    <option value="">Tutti i concessionari</option>
+                    <?php foreach ($dealers as $d): ?>
+                    <option value="<?= $d['id'] ?>" <?= ($_GET['dealer_id'] ?? '') == $d['id'] ? 'selected' : '' ?>><?= h($d['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <?php endif; ?>
-            <div class="col-md-2 d-flex gap-1">
+            <?php endif; ?>
+            <div class="col-md-2">
+                <input type="date" name="date_from" class="form-control" placeholder="Dal" title="Data intervento dal" value="<?= h($_GET['date_from'] ?? '') ?>">
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="date_to" class="form-control" placeholder="Al" title="Data intervento al" value="<?= h($_GET['date_to'] ?? '') ?>">
+            </div>
+            <div class="col-md-1 d-flex gap-1">
                 <button type="submit" class="btn btn-outline-primary flex-fill"><i class="bi bi-search"></i></button>
                 <a href="?" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
             </div>
@@ -111,6 +135,8 @@ include APP_ROOT . '/includes/header.php';
                         <th>Titolo</th>
                         <th>Tecnico</th>
                         <th>Data Intervento</th>
+                        <th>Tipo</th>
+                        <th>Ore</th>
                         <th>Concessionario</th>
                         <th>Stato</th>
                         <th>Ticket</th>
@@ -125,6 +151,8 @@ include APP_ROOT . '/includes/header.php';
                         <td><a href="<?= APP_URL ?>/modules/rapportini/view.php?id=<?= $r['id'] ?>" class="text-dark text-decoration-none"><?= h($r['title']) ?></a></td>
                         <td class="small"><?= h($r['technician_name'] ?? '-') ?></td>
                         <td class="small"><?= formatDate($r['intervention_date'], 'd/m/Y') ?></td>
+                        <td class="small"><?= $r['tipo_intervento'] ? h($r['tipo_intervento']) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="small"><?= ($r['ore_lavorate'] !== null && $r['ore_lavorate'] !== '') ? number_format((float)$r['ore_lavorate'],2,',','').'h' : '<span class="text-muted">-</span>' ?></td>
                         <td class="small"><?= $r['dealer_name'] ? h($r['dealer_name']) : '<span class="text-muted">-</span>' ?></td>
                         <td><?= getRapportinoStatusBadge($r['status']) ?></td>
                         <td class="small"><?= $r['ticket_title'] ? '<a href="'.APP_URL.'/modules/tickets/view.php?id='.$r['ticket_id'].'" class="text-decoration-none">'.h(getTicketPrefix().'-'.str_pad($r['ticket_id'],4,'0',STR_PAD_LEFT)).'</a>' : '<span class="text-muted">-</span>' ?></td>
