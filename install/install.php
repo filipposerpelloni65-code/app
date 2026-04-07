@@ -36,19 +36,33 @@ try {
         "CREATE TABLE IF NOT EXISTS spare_parts (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, sku VARCHAR(100), description TEXT, category_id INT, quantity INT NOT NULL DEFAULT 0, min_quantity INT NOT NULL DEFAULT 0, unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00, location VARCHAR(100), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY (category_id) REFERENCES spare_parts_categories(id))",
         "CREATE TABLE IF NOT EXISTS spare_parts_requests (id INT AUTO_INCREMENT PRIMARY KEY, ticket_id INT, part_id INT NOT NULL, requested_by INT NOT NULL, quantity INT NOT NULL DEFAULT 1, status ENUM('pending','approved','rejected','fulfilled') NOT NULL DEFAULT 'pending', notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY (ticket_id) REFERENCES tickets(id), FOREIGN KEY (part_id) REFERENCES spare_parts(id), FOREIGN KEY (requested_by) REFERENCES users(id))",
         "CREATE TABLE IF NOT EXISTS modules (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) NOT NULL, slug VARCHAR(100) NOT NULL UNIQUE, description TEXT, version VARCHAR(20) DEFAULT '1.0.0', enabled TINYINT(1) NOT NULL DEFAULT 1, icon VARCHAR(100), sort_order INT DEFAULT 0)",
-        "CREATE TABLE IF NOT EXISTS activity_log (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, action VARCHAR(100) NOT NULL, entity_type VARCHAR(50), entity_id INT, details TEXT, ip_address VARCHAR(45), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+        "CREATE TABLE IF NOT EXISTS activity_log (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, action VARCHAR(100) NOT NULL, entity_type VARCHAR(50), entity_id INT, details TEXT, ip_address VARCHAR(45), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+        "CREATE TABLE IF NOT EXISTS dealers (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, code VARCHAR(50) NOT NULL UNIQUE, email VARCHAR(100), phone VARCHAR(50), address VARCHAR(255), city VARCHAR(100), region VARCHAR(100), active TINYINT(1) NOT NULL DEFAULT 1, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
+        "CREATE TABLE IF NOT EXISTS dealer_locations (id INT AUTO_INCREMENT PRIMARY KEY, dealer_id INT NOT NULL, name VARCHAR(255) NOT NULL, code VARCHAR(50), address VARCHAR(255), city VARCHAR(100), phone VARCHAR(50), email VARCHAR(100), contact_person VARCHAR(100), active TINYINT(1) NOT NULL DEFAULT 1, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE)",
+        "CREATE TABLE IF NOT EXISTS dealer_users (dealer_id INT NOT NULL, location_id INT, user_id INT NOT NULL, PRIMARY KEY (dealer_id, user_id), FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"
     ];
 
     foreach ($tables as $sql) {
         $pdo->exec($sql);
     }
 
+    // Add dealer columns to tickets (safe for existing installs)
+    foreach ([
+        "ALTER TABLE tickets ADD COLUMN dealer_id INT NULL",
+        "ALTER TABLE tickets ADD COLUMN location_id INT NULL",
+        "ALTER TABLE spare_parts_requests ADD COLUMN dealer_id INT NULL",
+        "ALTER TABLE spare_parts_requests ADD COLUMN location_id INT NULL",
+    ] as $alter) {
+        try { $pdo->exec($alter); } catch (Exception $e) { /* column already exists */ }
+    }
+
     $pdo->exec("INSERT IGNORE INTO modules (name, slug, description, version, enabled, icon, sort_order) VALUES
         ('Gestione Ticket','tickets','Sistema di gestione ticket','1.0.0',1,'bi-ticket-detailed',1),
         ('Parti di Ricambio','spare_parts','Gestione magazzino parti di ricambio','1.0.0',1,'bi-tools',2),
-        ('Utenti','users','Gestione utenti del sistema','1.0.0',1,'bi-people',3),
-        ('Report','reports','Report e statistiche','1.0.0',1,'bi-bar-chart',4),
-        ('Impostazioni','settings','Configurazione sistema','1.0.0',1,'bi-gear',5)");
+        ('Concessionari','dealers','Gestione concessionari e punti vendita','1.0.0',1,'bi-shop',3),
+        ('Utenti','users','Gestione utenti del sistema','1.0.0',1,'bi-people',4),
+        ('Report','reports','Report e statistiche','1.0.0',1,'bi-bar-chart',5),
+        ('Impostazioni','settings','Configurazione sistema','1.0.0',1,'bi-gear',6)");
 
     $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES
         ('company_name','" . addslashes($companyName) . "'),

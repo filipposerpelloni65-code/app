@@ -17,17 +17,20 @@ $user = currentUser();
 $errors = [];
 $preTicketId = (int)($_GET['ticket_id'] ?? 0);
 $prePartId = (int)($_GET['part_id'] ?? 0);
+$preDealerId = (int)($_GET['dealer_id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) $errors[] = 'Token non valido.';
-    $ticket_id = (int)($_POST['ticket_id'] ?? 0) ?: null;
-    $part_id = (int)($_POST['part_id'] ?? 0);
-    $quantity = max(1, (int)($_POST['quantity'] ?? 1));
-    $notes = trim($_POST['notes'] ?? '');
+    $ticket_id   = (int)($_POST['ticket_id'] ?? 0) ?: null;
+    $part_id     = (int)($_POST['part_id'] ?? 0);
+    $quantity    = max(1, (int)($_POST['quantity'] ?? 1));
+    $notes       = trim($_POST['notes'] ?? '');
+    $dealer_id   = (int)($_POST['dealer_id'] ?? 0) ?: null;
+    $location_id = (int)($_POST['location_id'] ?? 0) ?: null;
     if (!$part_id) $errors[] = 'Seleziona una parte.';
     if (!$errors) {
-        $stmt = $db->prepare("INSERT INTO spare_parts_requests (ticket_id, part_id, requested_by, quantity, notes, status) VALUES (?,?,?,?,'pending',?)");
-        $stmt->execute([$ticket_id, $part_id, $user['id'], $quantity, $notes]);
+        $stmt = $db->prepare("INSERT INTO spare_parts_requests (ticket_id, part_id, requested_by, quantity, notes, dealer_id, location_id, status) VALUES (?,?,?,?,?,?,?,'pending')");
+        $stmt->execute([$ticket_id, $part_id, $user['id'], $quantity, $notes, $dealer_id, $location_id]);
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'request', 'spare_part', $part_id, "Richiesta parte per ticket $ticket_id");
         header('Location: ' . APP_URL . '/modules/spare_parts/requests.php?created=1');
@@ -37,6 +40,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $parts = $db->query("SELECT * FROM spare_parts WHERE quantity > 0 ORDER BY name")->fetchAll();
 $tickets = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT 100")->fetchAll();
+$dealers = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
+$selectedDealer = (int)($_POST['dealer_id'] ?? $preDealerId);
+$dealerLocations = [];
+if ($selectedDealer) {
+    $dlStmt = $db->prepare("SELECT id, name FROM dealer_locations WHERE dealer_id=? AND active=1 ORDER BY name");
+    $dlStmt->execute([$selectedDealer]);
+    $dealerLocations = $dlStmt->fetchAll();
+    // Also pre-fill dealer from linked ticket
+    if (!$preDealerId && $preTicketId) {
+        $tStmt = $db->prepare("SELECT dealer_id FROM tickets WHERE id=?");
+        $tStmt->execute([$preTicketId]);
+        $tRow = $tStmt->fetch();
+        if ($tRow && $tRow['dealer_id']) {
+            $selectedDealer = (int)$tRow['dealer_id'];
+        }
+    }
+}
 
 include APP_ROOT . '/includes/header.php';
 ?>
@@ -87,6 +107,31 @@ include APP_ROOT . '/includes/header.php';
         <label class="form-label fw-semibold">Note</label>
         <textarea name="notes" class="form-control" rows="3"><?= h($_POST['notes'] ?? '') ?></textarea>
     </div>
+    <?php if ($dealers): ?>
+    <hr>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Concessionario</label>
+            <select name="dealer_id" class="form-select" onchange="this.form.submit()">
+                <option value="">-- Nessun concessionario --</option>
+                <?php foreach ($dealers as $d): ?>
+                <option value="<?= $d['id'] ?>" <?= ($selectedDealer == $d['id']) ? 'selected' : '' ?>><?= h($d['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php if ($dealerLocations): ?>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Punto Vendita</label>
+            <select name="location_id" class="form-select">
+                <option value="">-- Nessun punto vendita --</option>
+                <?php foreach ($dealerLocations as $dl): ?>
+                <option value="<?= $dl['id'] ?>" <?= ($_POST['location_id'] ?? '') == $dl['id'] ? 'selected' : '' ?>><?= h($dl['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i>Invia Richiesta</button>
         <a href="<?= APP_URL ?>/modules/spare_parts/index.php" class="btn btn-light">Annulla</a>

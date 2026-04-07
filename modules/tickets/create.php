@@ -17,6 +17,9 @@ $user = currentUser();
 $errors = [];
 $success = false;
 
+// Pre-fill dealer from GET (e.g. linked from dealer view)
+$preDealerId = (int)($_GET['dealer_id'] ?? 0);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido. Riprova.'; }
     $title = trim($_POST['title'] ?? '');
@@ -24,13 +27,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $priority = $_POST['priority'] ?? 'medium';
     $category_id = (int)($_POST['category_id'] ?? 0) ?: null;
     $assigned_to = (int)($_POST['assigned_to'] ?? 0) ?: null;
+    $dealer_id = (int)($_POST['dealer_id'] ?? 0) ?: null;
+    $location_id = (int)($_POST['location_id'] ?? 0) ?: null;
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!$description) $errors[] = 'La descrizione è obbligatoria.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
 
     if (!$errors) {
-        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, status) VALUES (?,?,?,?,?,?,'open')");
-        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to]);
+        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, status) VALUES (?,?,?,?,?,?,?,?,'open')");
+        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id]);
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'create', 'ticket', $newId, "Creato ticket: $title");
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $newId . '&created=1');
@@ -40,6 +45,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $categories = $db->query("SELECT * FROM ticket_categories ORDER BY name")->fetchAll();
 $technicians = $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll();
+$dealers = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
+$dealerLocations = [];
+$selectedDealer = (int)($_POST['dealer_id'] ?? $preDealerId);
+if ($selectedDealer) {
+    $dlStmt = $db->prepare("SELECT id, name FROM dealer_locations WHERE dealer_id=? AND active=1 ORDER BY name");
+    $dlStmt->execute([$selectedDealer]);
+    $dealerLocations = $dlStmt->fetchAll();
+}
 
 include APP_ROOT . '/includes/header.php';
 ?>
@@ -101,6 +114,30 @@ include APP_ROOT . '/includes/header.php';
         </div>
         <?php endif; ?>
     </div>
+    <?php if ($dealers): ?>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Concessionario</label>
+            <select name="dealer_id" class="form-select" id="dealerSelect" onchange="this.form.submit()">
+                <option value="">-- Nessun concessionario --</option>
+                <?php foreach ($dealers as $d): ?>
+                <option value="<?= $d['id'] ?>" <?= ($selectedDealer == $d['id']) ? 'selected' : '' ?>><?= h($d['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php if ($dealerLocations): ?>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Punto Vendita</label>
+            <select name="location_id" class="form-select">
+                <option value="">-- Nessun punto vendita --</option>
+                <?php foreach ($dealerLocations as $dl): ?>
+                <option value="<?= $dl['id'] ?>" <?= ($_POST['location_id'] ?? '') == $dl['id'] ? 'selected' : '' ?>><?= h($dl['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Crea Ticket</button>
         <a href="<?= APP_URL ?>/modules/tickets/index.php" class="btn btn-light">Annulla</a>

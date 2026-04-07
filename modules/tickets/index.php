@@ -25,6 +25,8 @@ if (!empty($_GET['status'])) { $where[] = 't.status=?'; $params[] = $_GET['statu
 if (!empty($_GET['priority'])) { $where[] = 't.priority=?'; $params[] = $_GET['priority']; }
 if (!empty($_GET['assigned_to'])) { $where[] = 't.assigned_to=?'; $params[] = (int)$_GET['assigned_to']; }
 if (!empty($_GET['category_id'])) { $where[] = 't.category_id=?'; $params[] = (int)$_GET['category_id']; }
+if (!empty($_GET['dealer_id'])) { $where[] = 't.dealer_id=?'; $params[] = (int)$_GET['dealer_id']; }
+if (!empty($_GET['location_id'])) { $where[] = 't.location_id=?'; $params[] = (int)$_GET['location_id']; }
 if (!empty($_GET['q'])) { $where[] = '(t.title LIKE ? OR t.description LIKE ?)'; $params[] = '%'.$_GET['q'].'%'; $params[] = '%'.$_GET['q'].'%'; }
 if ($user['role'] === 'user') { $where[] = 't.created_by=?'; $params[] = $user['id']; }
 
@@ -34,12 +36,19 @@ $total->execute($params);
 $totalRows = (int)$total->fetchColumn();
 $totalPages = max(1, ceil($totalRows / $perPage));
 
-$stmt = $db->prepare("SELECT t.*, u.full_name as assignee_name, uc.full_name as creator_name, c.name as category_name FROM tickets t LEFT JOIN users u ON t.assigned_to=u.id LEFT JOIN users uc ON t.created_by=uc.id LEFT JOIN ticket_categories c ON t.category_id=c.id WHERE $whereStr ORDER BY t.created_at DESC LIMIT $perPage OFFSET $offset");
+$stmt = $db->prepare("SELECT t.*, u.full_name as assignee_name, uc.full_name as creator_name, c.name as category_name, d.name as dealer_name, dl.name as location_name FROM tickets t LEFT JOIN users u ON t.assigned_to=u.id LEFT JOIN users uc ON t.created_by=uc.id LEFT JOIN ticket_categories c ON t.category_id=c.id LEFT JOIN dealers d ON t.dealer_id=d.id LEFT JOIN dealer_locations dl ON t.location_id=dl.id WHERE $whereStr ORDER BY t.created_at DESC LIMIT $perPage OFFSET $offset");
 $stmt->execute($params);
 $tickets = $stmt->fetchAll();
 
 $categories = $db->query("SELECT * FROM ticket_categories ORDER BY name")->fetchAll();
 $technicians = $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll();
+$dealers = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
+$dealerLocations = [];
+if (!empty($_GET['dealer_id'])) {
+    $dlStmt = $db->prepare("SELECT id, name FROM dealer_locations WHERE dealer_id=? AND active=1 ORDER BY name");
+    $dlStmt->execute([(int)$_GET['dealer_id']]);
+    $dealerLocations = $dlStmt->fetchAll();
+}
 
 include APP_ROOT . '/includes/header.php';
 ?>
@@ -88,6 +97,31 @@ include APP_ROOT . '/includes/header.php';
                 <a href="?" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
             </div>
         </form>
+        <?php if ($dealers): ?>
+        <form method="get" class="row g-2 mt-1">
+            <?php foreach (['status','priority','category_id','assigned_to','q'] as $k): ?>
+            <?php if (!empty($_GET[$k])): ?><input type="hidden" name="<?= h($k) ?>" value="<?= h($_GET[$k]) ?>"><?php endif; ?>
+            <?php endforeach; ?>
+            <div class="col-md-4">
+                <select name="dealer_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">Tutti i concessionari</option>
+                    <?php foreach ($dealers as $d): ?>
+                    <option value="<?= $d['id'] ?>" <?= ($_GET['dealer_id'] ?? '') == $d['id'] ? 'selected' : '' ?>><?= h($d['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php if ($dealerLocations): ?>
+            <div class="col-md-4">
+                <select name="location_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">Tutti i punti vendita</option>
+                    <?php foreach ($dealerLocations as $dl): ?>
+                    <option value="<?= $dl['id'] ?>" <?= ($_GET['location_id'] ?? '') == $dl['id'] ? 'selected' : '' ?>><?= h($dl['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
+        </form>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -104,6 +138,7 @@ include APP_ROOT . '/includes/header.php';
                         <th>Priorità</th>
                         <th>Assegnato a</th>
                         <th>Creato da</th>
+                        <th>Concessionario</th>
                         <th>Data</th>
                         <th></th>
                     </tr>
@@ -119,6 +154,7 @@ include APP_ROOT . '/includes/header.php';
                         <td><?= getPriorityBadge($t['priority']) ?></td>
                         <td class="small"><?= $t['assignee_name'] ? h($t['assignee_name']) : '<span class="text-muted">Non assegnato</span>' ?></td>
                         <td class="small"><?= h($t['creator_name'] ?? '') ?></td>
+                        <td class="small"><?= $t['dealer_name'] ? '<a href="'.APP_URL.'/modules/dealers/view.php?id='.$t['dealer_id'].'" class="text-decoration-none">'.h($t['dealer_name']).'</a>' : '<span class="text-muted">-</span>' ?></td>
                         <td class="small text-muted"><?= formatDate($t['created_at'], 'd/m/Y') ?></td>
                         <td>
                             <div class="btn-group btn-group-sm">
@@ -131,7 +167,7 @@ include APP_ROOT . '/includes/header.php';
                     </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <tr><td colspan="9" class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-2"></i>Nessun ticket trovato</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-2"></i>Nessun ticket trovato</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>

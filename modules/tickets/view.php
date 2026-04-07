@@ -13,7 +13,7 @@ $user = currentUser();
 $id = (int)($_GET['id'] ?? 0);
 if (!$id) { header('Location: ' . APP_URL . '/modules/tickets/index.php'); exit; }
 
-$stmt = $db->prepare("SELECT t.*, uc.full_name as creator_name, ua.full_name as assignee_name, c.name as category_name FROM tickets t LEFT JOIN users uc ON t.created_by=uc.id LEFT JOIN users ua ON t.assigned_to=ua.id LEFT JOIN ticket_categories c ON t.category_id=c.id WHERE t.id=?");
+$stmt = $db->prepare("SELECT t.*, uc.full_name as creator_name, ua.full_name as assignee_name, c.name as category_name, d.name as dealer_name, dl.name as location_name FROM tickets t LEFT JOIN users uc ON t.created_by=uc.id LEFT JOIN users ua ON t.assigned_to=ua.id LEFT JOIN ticket_categories c ON t.category_id=c.id LEFT JOIN dealers d ON t.dealer_id=d.id LEFT JOIN dealer_locations dl ON t.location_id=dl.id WHERE t.id=?");
 $stmt->execute([$id]);
 $ticket = $stmt->fetch();
 if (!$ticket) { header('Location: ' . APP_URL . '/modules/tickets/index.php'); exit; }
@@ -187,6 +187,12 @@ include APP_ROOT . '/includes/header.php';
                     <dt class="col-sm-5">Categoria</dt><dd class="col-sm-7"><?= $ticket['category_name'] ? h($ticket['category_name']) : '-' ?></dd>
                     <dt class="col-sm-5">Creato da</dt><dd class="col-sm-7"><?= h($ticket['creator_name'] ?? '') ?></dd>
                     <dt class="col-sm-5">Assegnato a</dt><dd class="col-sm-7"><?= $ticket['assignee_name'] ? h($ticket['assignee_name']) : '<span class="text-muted">-</span>' ?></dd>
+                    <?php if ($ticket['dealer_name']): ?>
+                    <dt class="col-sm-5">Concessionario</dt><dd class="col-sm-7"><a href="<?= APP_URL ?>/modules/dealers/view.php?id=<?= $ticket['dealer_id'] ?>" class="text-decoration-none"><?= h($ticket['dealer_name']) ?></a></dd>
+                    <?php endif; ?>
+                    <?php if ($ticket['location_name']): ?>
+                    <dt class="col-sm-5">Punto Vendita</dt><dd class="col-sm-7"><?= h($ticket['location_name']) ?></dd>
+                    <?php endif; ?>
                     <dt class="col-sm-5">Creato il</dt><dd class="col-sm-7"><?= formatDate($ticket['created_at']) ?></dd>
                     <dt class="col-sm-5">Aggiornato</dt><dd class="col-sm-7"><?= formatDate($ticket['updated_at']) ?></dd>
                     <?php if ($ticket['closed_at']): ?>

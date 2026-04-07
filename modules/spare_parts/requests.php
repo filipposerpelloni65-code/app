@@ -40,15 +40,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
 }
 
 $filterStatus = $_GET['status'] ?? '';
+$filterDealer = (int)($_GET['dealer_id'] ?? 0);
 $where = '1=1';
 $params = [];
 if ($filterStatus) { $where .= ' AND spr.status=?'; $params[] = $filterStatus; }
+if ($filterDealer) { $where .= ' AND spr.dealer_id=?'; $params[] = $filterDealer; }
 // Technician sees only their requests unless admin
 if (!isAdmin()) { $where .= ' AND spr.requested_by=?'; $params[] = $user['id']; }
 
-$stmt = $db->prepare("SELECT spr.*, sp.name as part_name, sp.sku, u.full_name as requester_name, t.title as ticket_title FROM spare_parts_requests spr JOIN spare_parts sp ON spr.part_id=sp.id JOIN users u ON spr.requested_by=u.id LEFT JOIN tickets t ON spr.ticket_id=t.id WHERE $where ORDER BY spr.created_at DESC");
+$stmt = $db->prepare("SELECT spr.*, sp.name as part_name, sp.sku, u.full_name as requester_name, t.title as ticket_title, d.name as dealer_name, dl.name as location_name FROM spare_parts_requests spr JOIN spare_parts sp ON spr.part_id=sp.id JOIN users u ON spr.requested_by=u.id LEFT JOIN tickets t ON spr.ticket_id=t.id LEFT JOIN dealers d ON spr.dealer_id=d.id LEFT JOIN dealer_locations dl ON spr.location_id=dl.id WHERE $where ORDER BY spr.created_at DESC");
 $stmt->execute($params);
 $requests = $stmt->fetchAll();
+
+$dealers = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
 
 include APP_ROOT . '/includes/header.php';
 ?>

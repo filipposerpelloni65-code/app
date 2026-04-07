@@ -37,6 +37,7 @@ function getModuleUrl(string $slug): string {
     $urls = [
         'tickets' => APP_URL . '/modules/tickets/index.php',
         'spare_parts' => APP_URL . '/modules/spare_parts/index.php',
+        'dealers' => APP_URL . '/modules/dealers/index.php',
         'users' => APP_URL . '/modules/users/index.php',
         'reports' => APP_URL . '/modules/reports/index.php',
         'settings' => APP_URL . '/modules/settings/index.php',
