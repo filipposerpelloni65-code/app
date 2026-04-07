@@ -43,6 +43,7 @@ function getModuleUrl(string $slug): string {
         'settings' => APP_URL . '/modules/settings/index.php',
         'rapportini' => APP_URL . '/modules/rapportini/index.php',
         'periferiche' => APP_URL . '/modules/periferiche/index.php',
+        'notifications' => APP_URL . '/modules/notifications/index.php',
     ];
     return $urls[$slug] ?? '#';
 }

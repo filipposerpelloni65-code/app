@@ -142,3 +142,228 @@ $(document).ready(function () {
 
 // App URL global (set in PHP pages)
 window.appUrl = window.appUrl || '';
+
+/* ============================================================
+   Notification Centre — real-time polling + toast + dropdown
+   ============================================================ */
+(function () {
+    'use strict';
+
+    var appUrl       = document.querySelector('meta[name="app-url"]') ? document.querySelector('meta[name="app-url"]').content : window.appUrl;
+    var csrfMeta     = document.querySelector('meta[name="csrf-token"]');
+    var csrfToken    = csrfMeta ? csrfMeta.content : '';
+    var apiUrl       = appUrl + '/api/notifications.php';
+    var pollInterval = 30000;   // 30 s
+    var lastMaxId    = 0;
+    var isLoggedIn   = !!document.getElementById('notif-dropdown');
+
+    if (!isLoggedIn) return;
+
+    /* ── Type meta ─────────────────────────────────────────── */
+    var typeMeta = {
+        info:    { color: 'info',      icon: 'bi-info-circle-fill' },
+        success: { color: 'success',   icon: 'bi-check-circle-fill' },
+        warning: { color: 'warning',   icon: 'bi-exclamation-triangle-fill' },
+        danger:  { color: 'danger',    icon: 'bi-x-circle-fill' },
+        ticket:  { color: 'primary',   icon: 'bi-ticket-detailed-fill' },
+        comment: { color: 'secondary', icon: 'bi-chat-fill' },
+        status:  { color: 'warning',   icon: 'bi-arrow-repeat' },
+        assign:  { color: 'info',      icon: 'bi-person-fill-check' },
+        part:    { color: 'secondary', icon: 'bi-tools' },
+    };
+
+    function getMeta(type) {
+        return typeMeta[type] || { color: 'secondary', icon: 'bi-bell-fill' };
+    }
+
+    /* ── Badge helpers ─────────────────────────────────────── */
+    function updateBadge(count) {
+        var badge = document.getElementById('notif-bell-badge');
+        if (!badge) return;
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    /* ── Toast factory ─────────────────────────────────────── */
+    function showToast(notif) {
+        var meta    = getMeta(notif.type);
+        var toastId = 'toast-n-' + notif.id;
+        if (document.getElementById(toastId)) return; // already shown
+
+        var url      = notif.url ? notif.url : '#';
+        var msgHtml  = notif.message ? '<div class="toast-body small text-muted">' + escHtml(notif.message) + '</div>' : '';
+        var linkHtml = notif.url
+            ? '<a href="' + escHtml(notif.url) + '" class="btn btn-sm btn-outline-primary mt-2 notif-toast-link" data-id="' + notif.id + '">Visualizza</a>'
+            : '';
+
+        var html = '<div id="' + toastId + '" class="toast notif-toast toast-' + escHtml(notif.type) + ' align-items-start border-0 shadow" role="alert" aria-live="assertive" data-bs-autohide="true" data-bs-delay="7000">' +
+            '<div class="toast-header">' +
+            '<i class="bi ' + getMeta(notif.type).icon + ' text-' + meta.color + ' me-2"></i>' +
+            '<strong class="me-auto">' + escHtml(notif.title) + '</strong>' +
+            '<small class="text-muted ms-2">ora</small>' +
+            '<button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>' +
+            '</div>' +
+            (notif.message ? '<div class="toast-body small text-muted">' + escHtml(notif.message) + (linkHtml ? '<br>' + linkHtml : '') + '</div>' : (linkHtml ? '<div class="toast-body">' + linkHtml + '</div>' : '')) +
+            '</div>';
+
+        var container = document.getElementById('toast-container');
+        if (!container) return;
+        container.insertAdjacentHTML('beforeend', html);
+        var el = document.getElementById(toastId);
+        if (el) {
+            el.addEventListener('hidden.bs.toast', function () { el.remove(); });
+            var bsToast = new bootstrap.Toast(el);
+            bsToast.show();
+
+            // Mark read when clicking "Visualizza" inside toast
+            el.addEventListener('click', function (e) {
+                var link = e.target.closest('.notif-toast-link');
+                if (link) {
+                    e.preventDefault();
+                    markRead(link.dataset.id, function () {
+                        window.location.href = link.href;
+                    });
+                }
+            });
+        }
+    }
+
+    /* ── HTML escaping ─────────────────────────────────────── */
+    function escHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── Mark read ─────────────────────────────────────────── */
+    function markRead(id, cb) {
+        $.post(apiUrl, { action: 'mark_read', id: id, csrf_token: csrfToken }, function (r) {
+            if (typeof r === 'string') r = JSON.parse(r);
+            if (r.success) { updateBadge(r.unread || 0); }
+            if (cb) cb();
+        });
+    }
+
+    /* ── Dropdown list renderer ────────────────────────────── */
+    function renderDropdown(notifications) {
+        var list  = document.getElementById('notif-dropdown-list');
+        if (!list) return;
+
+        if (!notifications || !notifications.length) {
+            list.innerHTML = '<div class="text-center text-muted py-4 small"><i class="bi bi-bell-slash fs-4 d-block mb-2"></i>Nessuna notifica</div>';
+            return;
+        }
+
+        var html = '';
+        notifications.forEach(function (n) {
+            var meta    = getMeta(n.type);
+            var urlAttr = n.url ? 'href="' + escHtml(n.url) + '"' : 'href="#"';
+            html += '<a ' + urlAttr + ' class="notif-dropdown-item' + (n.is_read ? '' : ' unread') + '" data-id="' + n.id + '">' +
+                '<div class="d-flex align-items-start gap-2">' +
+                '<div class="notif-type-dot notif-dot-' + escHtml(n.type) + '"></div>' +
+                '<div class="flex-grow-1 min-w-0">' +
+                '<div class="d-flex justify-content-between">' +
+                '<span class="small fw-semibold text-truncate">' + escHtml(n.title) + '</span>' +
+                '<span class="text-muted small ms-2 text-nowrap">' + formatRelativeTime(n.created_at) + '</span>' +
+                '</div>' +
+                (n.message ? '<div class="text-muted small text-truncate">' + escHtml(n.message) + '</div>' : '') +
+                '</div></div></a>';
+        });
+        list.innerHTML = html;
+    }
+
+    /* ── Relative time helper ──────────────────────────────── */
+    function formatRelativeTime(dateStr) {
+        var d = new Date(dateStr.replace(' ', 'T'));
+        var diff = Math.floor((Date.now() - d.getTime()) / 1000);
+        if (diff < 60)   return 'ora';
+        if (diff < 3600) return Math.floor(diff / 60) + ' min';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' h';
+        return Math.floor(diff / 86400) + ' g';
+    }
+
+    /* ── Initial load of dropdown ──────────────────────────── */
+    function loadDropdown() {
+        $.get(apiUrl, { action: 'fetch' }, function (r) {
+            if (typeof r === 'string') r = JSON.parse(r);
+            if (!r.success) return;
+            updateBadge(r.unread || 0);
+            renderDropdown(r.notifications || []);
+
+            // Track the max ID we have seen
+            if (r.notifications && r.notifications.length) {
+                var ids = r.notifications.map(function (n) { return parseInt(n.id, 10); });
+                lastMaxId = Math.max.apply(null, ids);
+            }
+        });
+    }
+
+    /* ── Polling ───────────────────────────────────────────── */
+    function poll() {
+        $.get(apiUrl, { action: 'poll', since: lastMaxId }, function (r) {
+            if (typeof r === 'string') r = JSON.parse(r);
+            if (!r.success) return;
+            updateBadge(r.unread || 0);
+
+            var newNotifs = r.notifications || [];
+            if (newNotifs.length) {
+                // Show toasts for each new notification
+                newNotifs.forEach(function (n) {
+                    if (!n.is_read) showToast(n);
+                });
+
+                // Update lastMaxId
+                var ids = newNotifs.map(function (n) { return parseInt(n.id, 10); });
+                lastMaxId = Math.max(lastMaxId, Math.max.apply(null, ids));
+
+                // Reload dropdown list if it's open
+                if ($('#notif-dropdown').hasClass('show')) {
+                    loadDropdown();
+                }
+            }
+        });
+    }
+
+    /* ── Dropdown open event ───────────────────────────────── */
+    document.addEventListener('show.bs.dropdown', function (e) {
+        if (e.target && e.target.closest('#notif-dropdown')) {
+            loadDropdown();
+        }
+    });
+
+    /* ── Dropdown item click → mark read ──────────────────── */
+    $(document).on('click', '.notif-dropdown-item', function (e) {
+        var id  = $(this).data('id');
+        var url = $(this).attr('href');
+        if (!id) return;
+        e.preventDefault();
+        markRead(id, function () {
+            if (url && url !== '#') window.location.href = url;
+            else loadDropdown();
+        });
+    });
+
+    /* ── Mark all read button in dropdown ──────────────────── */
+    $(document).on('click', '#notif-mark-all', function (e) {
+        e.preventDefault();
+        $.post(apiUrl, { action: 'mark_all_read', csrf_token: csrfToken }, function (r) {
+            if (typeof r === 'string') r = JSON.parse(r);
+            if (r.success) {
+                updateBadge(0);
+                loadDropdown();
+            }
+        });
+    });
+
+    /* ── Bootstrap prevents link clicks in dropdowns — stop propagation ── */
+    $(document).on('click', '.notif-dropdown-menu', function (e) {
+        e.stopPropagation();
+    });
+
+    /* ── Start ─────────────────────────────────────────────── */
+    loadDropdown();
+    setInterval(poll, pollInterval);
+
+}());

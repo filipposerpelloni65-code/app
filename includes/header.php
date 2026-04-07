@@ -18,6 +18,8 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/app.css">
+    <meta name="csrf-token" content="<?= htmlspecialchars(generateCsrfToken()) ?>">
+    <meta name="app-url" content="<?= htmlspecialchars(APP_URL) ?>">
 </head>
 <body>
 <?php if ($currentUser): ?>
@@ -82,11 +84,48 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
                     <?php endif; ?>
                 </ol>
             </nav>
+            <?php
+            $notifUnread = getUnreadNotificationCount((int)$currentUser['id']);
+            ?>
+            <!-- Notification Bell -->
+            <div class="dropdown me-2" id="notif-dropdown">
+                <a href="#" class="btn btn-outline-secondary position-relative notif-bell-btn"
+                   data-bs-toggle="dropdown" aria-expanded="false"
+                   title="Notifiche">
+                    <i class="bi bi-bell"></i>
+                    <span id="notif-bell-badge"
+                          class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                          <?= $notifUnread === 0 ? 'style="display:none"' : '' ?>>
+                        <?= $notifUnread > 99 ? '99+' : $notifUnread ?>
+                    </span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end shadow notif-dropdown-menu p-0" style="min-width:360px;max-width:420px">
+                    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                        <strong class="small">Notifiche</strong>
+                        <a href="<?= APP_URL ?>/modules/notifications/index.php" class="small text-primary text-decoration-none">Vedi tutte</a>
+                    </div>
+                    <div id="notif-dropdown-list" style="max-height:380px;overflow-y:auto">
+                        <div class="text-center text-muted py-3 small" id="notif-loading">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                        </div>
+                    </div>
+                    <div class="border-top px-3 py-2 d-flex justify-content-between">
+                        <button class="btn btn-sm btn-link text-muted p-0" id="notif-mark-all">
+                            <i class="bi bi-check2-all me-1"></i>Segna tutto letto
+                        </button>
+                        <a href="<?= APP_URL ?>/modules/notifications/index.php" class="btn btn-sm btn-link text-primary p-0">
+                            Centro notifiche <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
             <span class="badge bg-<?= $currentUser['role'] === 'admin' ? 'danger' : ($currentUser['role'] === 'technician' ? 'warning text-dark' : 'primary') ?> ms-2">
                 <?= h(ucfirst($currentUser['role'])) ?>
             </span>
         </nav>
         <div class="container-fluid p-4">
+<!-- Toast container for real-time notifications -->
+<div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1100"></div>
 <?php else: ?>
 <div class="container-fluid">
 <?php endif; ?>

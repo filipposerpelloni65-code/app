@@ -145,3 +145,47 @@ function getPerifericaStatoLabel(string $stato): string {
     ];
     return $labels[$stato] ?? $stato;
 }
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+function createNotification(int $userId, string $type, string $title, string $message = '', string $entityType = '', int $entityId = 0, string $url = ''): void {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare('INSERT INTO notifications (user_id, type, title, message, entity_type, entity_id, url) VALUES (?,?,?,?,?,?,?)');
+        $stmt->execute([
+            $userId,
+            $type,
+            $title,
+            $message,
+            $entityType ?: null,
+            $entityId ?: null,
+            $url ?: null,
+        ]);
+    } catch (Exception $e) {
+        // Fail silently — notifications must not break main flow
+    }
+}
+
+function getUnreadNotificationCount(int $userId): int {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
+        $stmt->execute([$userId]);
+        return (int)$stmt->fetchColumn();
+    } catch (Exception $e) {
+        return 0;
+    }
+}
+
+function notifyAdmins(string $type, string $title, string $message = '', string $entityType = '', int $entityId = 0, string $url = '', int $excludeUserId = 0): void {
+    try {
+        $db = getDB();
+        $admins = $db->query("SELECT id FROM users WHERE role = 'admin' AND active = 1")->fetchAll();
+        foreach ($admins as $admin) {
+            if ($admin['id'] == $excludeUserId) continue;
+            createNotification((int)$admin['id'], $type, $title, $message, $entityType, $entityId, $url);
+        }
+    } catch (Exception $e) {
+        // Fail silently
+    }
+}
