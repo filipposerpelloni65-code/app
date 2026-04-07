@@ -144,8 +144,8 @@ include APP_ROOT . '/includes/header.php';
 
 <?php if (isTechnician()): ?>
 <?php
-$modalParts   = $db->query("SELECT * FROM spare_parts WHERE quantity > 0 ORDER BY name")->fetchAll();
-$modalTickets = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT 100")->fetchAll();
+$modalParts   = getModalSpareParts();
+$modalTickets = getModalOpenTickets();
 ?>
 <!-- ============================================================
      Parts Request Modal

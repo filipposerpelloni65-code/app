@@ -371,15 +371,19 @@ include APP_ROOT . '/includes/header.php';
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white"><h6 class="mb-0">Azioni</h6></div>
             <div class="card-body d-grid gap-2">
+                <?php if (isModuleEnabled('spare_parts')): ?>
                 <?php
-                $modalParts   = $db->query("SELECT * FROM spare_parts WHERE quantity > 0 ORDER BY name")->fetchAll();
-                $modalTickets = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT 100")->fetchAll();
+                $modalParts   = getModalSpareParts();
+                $modalTickets = getModalOpenTickets();
                 ?>
-                <?php if ($modalParts && isModuleEnabled('spare_parts')): ?>
+                <?php if ($modalParts): ?>
                 <button type="button" class="btn btn-sm btn-outline-secondary"
                     data-bs-toggle="modal" data-bs-target="#partRequestModalView">
                     <i class="bi bi-tools me-1"></i>Richiedi Parte
                 </button>
+                <?php else: ?>
+                <a href="<?= APP_URL ?>/modules/spare_parts/request.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-tools me-1"></i>Richiedi Parte</a>
+                <?php endif; ?>
                 <?php else: ?>
                 <a href="<?= APP_URL ?>/modules/spare_parts/request.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-tools me-1"></i>Richiedi Parte</a>
                 <?php endif; ?>

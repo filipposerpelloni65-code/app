@@ -145,3 +145,21 @@ function getPerifericaStatoLabel(string $stato): string {
     ];
     return $labels[$stato] ?? $stato;
 }
+
+/**
+ * Return available spare parts (quantity > 0) for modal selects.
+ */
+function getModalSpareParts(): array {
+    $db = getDB();
+    return $db->query("SELECT id, name, sku, quantity FROM spare_parts WHERE quantity > 0 ORDER BY name")->fetchAll();
+}
+
+/**
+ * Return open tickets (not closed) for modal selects.
+ */
+function getModalOpenTickets(int $limit = 100): array {
+    $db   = getDB();
+    $stmt = $db->prepare("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT ?");
+    $stmt->execute([$limit]);
+    return $stmt->fetchAll();
+}

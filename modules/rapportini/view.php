@@ -108,7 +108,9 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("signForm").addEventListener("submit", function(e) {
             if (signaturePad.isEmpty()) {
                 e.preventDefault();
-                alert("Per favore, disegna la firma prima di procedere.");
+                if (window.showConfirmModal) {
+                    showConfirmModal("Per favore, disegna la firma prima di procedere.", null, { title: "Firma richiesta", hideOk: true });
+                }
                 return;
             }
             document.getElementById("signatureDataInput").value = signaturePad.toDataURL("image/png");

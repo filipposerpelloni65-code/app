@@ -2,6 +2,15 @@
    HelpDesk - Main JavaScript
    ============================================ */
 
+// Shared ticket status labels (used in multiple places)
+const STATUS_LABELS = {
+    'open':        'Aperto',
+    'in_progress': 'In Lavorazione',
+    'waiting':     'In Attesa',
+    'resolved':    'Risolto',
+    'closed':      'Chiuso'
+};
+
 $(document).ready(function () {
 
     // Sidebar toggle
@@ -34,26 +43,34 @@ $(document).ready(function () {
     /**
      * Show the global confirmation modal.
      * @param {string}   message   - Body text
-     * @param {function} onConfirm - Callback executed when user confirms
-     * @param {object}   options   - { title, btnClass, btnText }
+     * @param {function} onConfirm - Callback executed when user confirms (null for alert-only)
+     * @param {object}   options   - { title, btnClass, btnText, hideOk }
      */
     window.showConfirmModal = function (message, onConfirm, options) {
         options = options || {};
-        var title   = options.title    || 'Conferma';
+        var title    = options.title    || 'Conferma';
         var btnClass = options.btnClass || 'btn-danger';
         var btnText  = options.btnText  || 'Conferma';
+        var hideOk   = options.hideOk  || false;
 
         $('#confirmModalTitle').text(title);
         $('#confirmModalBody').text(message);
-        $('#confirmModalOk')
-            .attr('class', 'btn btn-sm ' + btnClass)
-            .off('click.modalConfirm')
-            .on('click.modalConfirm', function () {
-                var modalEl = document.getElementById('confirmModal');
-                var bsModal = bootstrap.Modal.getInstance(modalEl);
-                if (bsModal) bsModal.hide();
-                if (typeof onConfirm === 'function') onConfirm();
-            });
+
+        var $okBtn = $('#confirmModalOk');
+        if (hideOk) {
+            $okBtn.addClass('d-none');
+        } else {
+            $okBtn.removeClass('d-none');
+            $okBtn
+                .attr('class', 'btn btn-sm ' + btnClass)
+                .off('click.modalConfirm')
+                .on('click.modalConfirm', function () {
+                    var modalEl = document.getElementById('confirmModal');
+                    var bsModal = bootstrap.Modal.getInstance(modalEl);
+                    if (bsModal) bsModal.hide();
+                    if (typeof onConfirm === 'function') onConfirm();
+                });
+        }
         $('#confirmModalOkText').text(btnText);
 
         var modalEl = document.getElementById('confirmModal');
@@ -92,16 +109,9 @@ $(document).ready(function () {
     // Status change form — show confirmation modal
     $(document).on('submit', '#statusUpdateForm', function (e) {
         e.preventDefault();
-        var $form    = $(this);
+        var $form     = $(this);
         var newStatus = $form.find('[name="new_status"]').val();
-        var statusLabels = {
-            'open':        'Aperto',
-            'in_progress': 'In Lavorazione',
-            'waiting':     'In Attesa',
-            'resolved':    'Risolto',
-            'closed':      'Chiuso'
-        };
-        var label = statusLabels[newStatus] || newStatus;
+        var label     = STATUS_LABELS[newStatus] || newStatus;
 
         showConfirmModal(
             'Confermi il cambio di stato a: ' + label + '?',
@@ -139,14 +149,7 @@ $(document).ready(function () {
         e.preventDefault();
         var $form     = $(this);
         var newStatus = $form.find('#statusModalSelect').val();
-        var statusLabels = {
-            'open':        'Aperto',
-            'in_progress': 'In Lavorazione',
-            'waiting':     'In Attesa',
-            'resolved':    'Risolto',
-            'closed':      'Chiuso'
-        };
-        var label = statusLabels[newStatus] || newStatus;
+        var label     = STATUS_LABELS[newStatus] || newStatus;
 
         // Close the status modal first, then show confirm
         var statusModalEl = document.getElementById('ticketStatusModal');
@@ -203,7 +206,7 @@ $(document).ready(function () {
 
     // Character counter for textareas
     $('textarea[maxlength]').each(function () {
-        var max     = $(this).attr('maxlength');
+        var max = $(this).attr('maxlength');
         var counter = $('<small class="text-muted char-counter"></small>');
         $(this).after(counter);
         var update = function () {
@@ -217,7 +220,7 @@ $(document).ready(function () {
 
     // Module toggle via AJAX in settings
     $(document).on('change', '.module-toggle', function () {
-        var slug    = $(this).data('slug');
+        var slug = $(this).data('slug');
         var enabled = $(this).is(':checked') ? 1 : 0;
         var csrfVal = $('input[name="csrf_token"]').first().val();
         $.post(window.appUrl + '/modules/settings/index.php', {
@@ -228,10 +231,10 @@ $(document).ready(function () {
         }).done(function (resp) {
             var data = typeof resp === 'string' ? JSON.parse(resp) : resp;
             if (!data.success) {
-                showConfirmModal('Errore durante il salvataggio.', null, { title: 'Errore', btnClass: 'd-none' });
+                showConfirmModal('Errore durante il salvataggio.', null, { title: 'Errore', hideOk: true });
             }
         }).fail(function () {
-            showConfirmModal('Errore di comunicazione con il server.', null, { title: 'Errore', btnClass: 'd-none' });
+            showConfirmModal('Errore di comunicazione con il server.', null, { title: 'Errore', hideOk: true });
         });
     });
 
