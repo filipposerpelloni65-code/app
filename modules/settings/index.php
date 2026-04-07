@@ -19,7 +19,7 @@ $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['section'] ?? '') === 'general') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
     else {
-        $fields = ['company_name','ticket_prefix','items_per_page','email_notifications','smtp_host','smtp_port','smtp_user'];
+        $fields = ['company_name','ticket_prefix','items_per_page','email_notifications','smtp_host','smtp_port','smtp_user','auto_close_days','auto_close_secret'];
         foreach ($fields as $k) {
             $v = trim($_POST[$k] ?? '');
             $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?")->execute([$k,$v,$v]);
@@ -144,6 +144,20 @@ include APP_ROOT . '/includes/header.php';
                 <div class="col-md-5">
                     <label class="form-label">Password SMTP <small class="text-muted">(lascia vuoto per non cambiare)</small></label>
                     <input type="password" name="smtp_pass" class="form-control">
+                </div>
+            </div>
+            <hr>
+            <h6 class="mb-3"><i class="bi bi-arrow-clockwise me-1"></i>Chiusura Automatica Ticket</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <label class="form-label">Giorni per Auto-Chiusura</label>
+                    <input type="number" name="auto_close_days" class="form-control" min="1" max="365" value="<?= h($settings['auto_close_days'] ?? '7') ?>">
+                    <div class="form-text">Ticket "risolti" da N giorni vengono chiusi automaticamente.</div>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Secret Auto-Chiusura (cron)</label>
+                    <input type="text" name="auto_close_secret" class="form-control font-monospace" value="<?= h($settings['auto_close_secret'] ?? '') ?>" placeholder="Lascia vuoto per disabilitare">
+                    <div class="form-text">Endpoint: <code>/api/auto_close.php?secret=SECRET</code></div>
                 </div>
             </div>
             <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salva</button>

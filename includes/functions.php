@@ -145,3 +145,61 @@ function getPerifericaStatoLabel(string $stato): string {
     ];
     return $labels[$stato] ?? $stato;
 }
+
+function getSpedizioneStatusBadge(string $status): string {
+    $badges = [
+        'da_spedire'  => '<span class="badge bg-secondary">Da Spedire</span>',
+        'spedita'     => '<span class="badge bg-primary">Spedita</span>',
+        'consegnata'  => '<span class="badge bg-success">Consegnata</span>',
+        'annullata'   => '<span class="badge bg-danger">Annullata</span>',
+    ];
+    return $badges[$status] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($status) . '</span>';
+}
+
+function getSpedizioneStatusLabel(string $status): string {
+    $labels = [
+        'da_spedire' => 'Da Spedire',
+        'spedita'    => 'Spedita',
+        'consegnata' => 'Consegnata',
+        'annullata'  => 'Annullata',
+    ];
+    return $labels[$status] ?? $status;
+}
+
+function getNotificationCounts(): array {
+    $counts = [
+        'open_tickets'      => 0,
+        'pending_requests'  => 0,
+        'periferiche_active'=> 0,
+        'total'             => 0,
+    ];
+    try {
+        $db = getDB();
+        $user = currentUser();
+        if (!$user) return $counts;
+
+        if (isTechnician()) {
+            $counts['open_tickets']      = (int)$db->query("SELECT COUNT(*) FROM tickets WHERE status IN ('open','in_progress')")->fetchColumn();
+            $counts['pending_requests']  = (int)$db->query("SELECT COUNT(*) FROM spare_parts_requests WHERE status='pending'")->fetchColumn();
+            $counts['periferiche_active']= (int)$db->query("SELECT COUNT(*) FROM periferiche_guaste WHERE stato NOT IN ('restituita','rottamata','non_riparabile')")->fetchColumn();
+        } else {
+            $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE created_by=? AND status IN ('open','in_progress')");
+            $stmt->execute([$user['id']]);
+            $counts['open_tickets'] = (int)$stmt->fetchColumn();
+        }
+        $counts['total'] = $counts['open_tickets'] + $counts['pending_requests'];
+    } catch (Exception $e) {
+        // silent
+    }
+    return $counts;
+}
+
+function getAutoAssignee(): ?int {
+    try {
+        $db = getDB();
+        $row = $db->query("SELECT u.id FROM users u LEFT JOIN tickets t ON t.assigned_to=u.id AND t.status IN ('open','in_progress') WHERE u.role IN ('admin','technician') AND u.active=1 GROUP BY u.id ORDER BY COUNT(t.id) ASC LIMIT 1")->fetch();
+        return $row ? (int)$row['id'] : null;
+    } catch (Exception $e) {
+        return null;
+    }
+}

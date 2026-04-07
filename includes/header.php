@@ -8,6 +8,7 @@ $appName = defined('APP_NAME') ? APP_NAME : 'HelpDesk';
 $enabledModules = getEnabledModules();
 $currentScript = basename($_SERVER['PHP_SELF']);
 $currentPath = $_SERVER['PHP_SELF'] ?? '';
+$notifCounts = $currentUser ? getNotificationCounts() : [];
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -33,6 +34,9 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
             <li class="nav-item">
                 <a href="<?= APP_URL ?>/dashboard.php" class="nav-link text-white <?= strpos($currentPath, 'dashboard.php') !== false ? 'active' : '' ?>">
                     <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                    <?php if (!empty($notifCounts['total']) && $notifCounts['total'] > 0 && strpos($currentPath, 'dashboard.php') === false): ?>
+                    <span class="badge bg-danger ms-1"><?= (int)$notifCounts['total'] ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <?php foreach ($enabledModules as $module): ?>
@@ -41,10 +45,19 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
                 $modPath = '/modules/' . $module['slug'] . '/';
                 $isActive = strpos($currentPath, $modPath) !== false;
                 if (in_array($module['slug'], ['users', 'settings']) && !isAdmin()) continue;
+                // Badge counts per module
+                $modBadge = '';
+                if ($module['slug'] === 'tickets' && !empty($notifCounts['open_tickets'])) {
+                    $modBadge = '<span class="badge bg-primary ms-1">' . (int)$notifCounts['open_tickets'] . '</span>';
+                } elseif ($module['slug'] === 'spare_parts' && !empty($notifCounts['pending_requests'])) {
+                    $modBadge = '<span class="badge bg-warning text-dark ms-1">' . (int)$notifCounts['pending_requests'] . '</span>';
+                } elseif ($module['slug'] === 'periferiche' && !empty($notifCounts['periferiche_active'])) {
+                    $modBadge = '<span class="badge bg-info text-dark ms-1">' . (int)$notifCounts['periferiche_active'] . '</span>';
+                }
             ?>
             <li class="nav-item">
                 <a href="<?= h($modUrl) ?>" class="nav-link text-white <?= $isActive ? 'active' : '' ?>">
-                    <i class="bi <?= h($module['icon']) ?> me-2"></i><?= h($module['name']) ?>
+                    <i class="bi <?= h($module['icon']) ?> me-2"></i><?= h($module['name']) ?><?= $modBadge ?>
                 </a>
             </li>
             <?php endforeach; ?>
@@ -82,11 +95,20 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
                     <?php endif; ?>
                 </ol>
             </nav>
+            <!-- Global Search -->
+            <div class="me-2 d-none d-md-block" style="width:260px">
+                <div class="input-group input-group-sm">
+                    <input type="text" id="globalSearchInput" class="form-control" placeholder="Cerca ticket, ricambi, periferiche...">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                </div>
+                <div id="globalSearchResults" class="position-absolute bg-white border rounded shadow-sm" style="width:260px;z-index:1050;display:none;max-height:320px;overflow-y:auto;top:52px;right:90px;"></div>
+            </div>
             <span class="badge bg-<?= $currentUser['role'] === 'admin' ? 'danger' : ($currentUser['role'] === 'technician' ? 'warning text-dark' : 'primary') ?> ms-2">
                 <?= h(ucfirst($currentUser['role'])) ?>
             </span>
         </nav>
         <div class="container-fluid p-4">
+        <script>window.appUrl = '<?= APP_URL ?>';</script>
 <?php else: ?>
 <div class="container-fluid">
 <?php endif; ?>
