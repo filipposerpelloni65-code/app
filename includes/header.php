@@ -8,12 +8,14 @@ $appName = defined('APP_NAME') ? APP_NAME : 'HelpDesk';
 $enabledModules = getEnabledModules();
 $currentScript = basename($_SERVER['PHP_SELF']);
 $currentPath = $_SERVER['PHP_SELF'] ?? '';
+$notifCounts = $currentUser ? getNotificationCounts() : [];
 ?>
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?= htmlspecialchars(generateCsrfToken()) ?>">
     <title><?= defined('PAGE_TITLE') ? h(PAGE_TITLE) . ' - ' : '' ?><?= h($appName) ?></title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -33,6 +35,9 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
             <li class="nav-item">
                 <a href="<?= APP_URL ?>/dashboard.php" class="nav-link text-white <?= strpos($currentPath, 'dashboard.php') !== false ? 'active' : '' ?>">
                     <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                    <?php if (($notifCounts['open_tickets'] ?? 0) > 0): ?>
+                    <span class="badge bg-primary ms-auto"><?= $notifCounts['open_tickets'] ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <?php foreach ($enabledModules as $module): ?>
@@ -41,10 +46,19 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
                 $modPath = '/modules/' . $module['slug'] . '/';
                 $isActive = strpos($currentPath, $modPath) !== false;
                 if (in_array($module['slug'], ['users', 'settings']) && !isAdmin()) continue;
+                // Notification badge per modulo
+                $badge = '';
+                if ($module['slug'] === 'spare_parts' && ($notifCounts['pending_parts'] ?? 0) > 0) {
+                    $badge = '<span class="badge bg-warning text-dark ms-auto">' . $notifCounts['pending_parts'] . '</span>';
+                } elseif ($module['slug'] === 'spedizioni' && ($notifCounts['da_spedire'] ?? 0) > 0) {
+                    $badge = '<span class="badge bg-primary ms-auto">' . $notifCounts['da_spedire'] . '</span>';
+                } elseif ($module['slug'] === 'periferiche' && ($notifCounts['periferiche_wait'] ?? 0) > 0) {
+                    $badge = '<span class="badge bg-info text-dark ms-auto">' . $notifCounts['periferiche_wait'] . '</span>';
+                }
             ?>
             <li class="nav-item">
                 <a href="<?= h($modUrl) ?>" class="nav-link text-white <?= $isActive ? 'active' : '' ?>">
-                    <i class="bi <?= h($module['icon']) ?> me-2"></i><?= h($module['name']) ?>
+                    <i class="bi <?= h($module['icon']) ?> me-2"></i><?= h($module['name']) ?><?= $badge ?>
                 </a>
             </li>
             <?php endforeach; ?>
@@ -82,6 +96,14 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
                     <?php endif; ?>
                 </ol>
             </nav>
+            <!-- Global search -->
+            <form class="d-none d-md-flex me-2 position-relative" id="globalSearchForm" autocomplete="off">
+                <div class="input-group input-group-sm" style="width:240px">
+                    <input type="search" class="form-control" id="globalSearchInput" placeholder="Cerca..." aria-label="Cerca">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                </div>
+                <div id="searchResults" class="dropdown-menu shadow-sm p-0" style="display:none;min-width:320px;position:absolute;top:100%;right:0;z-index:1050"></div>
+            </form>
             <span class="badge bg-<?= $currentUser['role'] === 'admin' ? 'danger' : ($currentUser['role'] === 'technician' ? 'warning text-dark' : 'primary') ?> ms-2">
                 <?= h(ucfirst($currentUser['role'])) ?>
             </span>
