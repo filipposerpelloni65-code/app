@@ -39,18 +39,15 @@ $filter  = $_GET['filter'] ?? 'all'; // all | unread
 
 $whereExtra = $filter === 'unread' ? ' AND is_read = 0' : '';
 
-$total = (int)$db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ?$whereExtra")
-                  ->execute([$uid]) ? $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ?$whereExtra")->fetchColumn() : 0;
-
 $countStmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ?$whereExtra");
 $countStmt->execute([$uid]);
 $total = (int)$countStmt->fetchColumn();
 $totalPages = max(1, ceil($total / $perPage));
 
 $stmt = $db->prepare(
-    "SELECT * FROM notifications WHERE user_id = ?$whereExtra ORDER BY created_at DESC LIMIT $perPage OFFSET $offset"
+    "SELECT * FROM notifications WHERE user_id = ?$whereExtra ORDER BY created_at DESC LIMIT ? OFFSET ?"
 );
-$stmt->execute([$uid]);
+$stmt->execute([$uid, $perPage, $offset]);
 $notifications = $stmt->fetchAll();
 
 $unreadCount = getUnreadNotificationCount($uid);

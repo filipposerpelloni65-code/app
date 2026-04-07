@@ -194,21 +194,24 @@ window.appUrl = window.appUrl || '';
         var toastId = 'toast-n-' + notif.id;
         if (document.getElementById(toastId)) return; // already shown
 
-        var url      = notif.url ? notif.url : '#';
-        var msgHtml  = notif.message ? '<div class="toast-body small text-muted">' + escHtml(notif.message) + '</div>' : '';
         var linkHtml = notif.url
             ? '<a href="' + escHtml(notif.url) + '" class="btn btn-sm btn-outline-primary mt-2 notif-toast-link" data-id="' + notif.id + '">Visualizza</a>'
             : '';
 
+        var bodyHtml = '';
+        if (notif.message) {
+            bodyHtml = '<div class="toast-body small text-muted">' + escHtml(notif.message) + (linkHtml ? '<br>' + linkHtml : '') + '</div>';
+        } else if (linkHtml) {
+            bodyHtml = '<div class="toast-body">' + linkHtml + '</div>';
+        }
+
         var html = '<div id="' + toastId + '" class="toast notif-toast toast-' + escHtml(notif.type) + ' align-items-start border-0 shadow" role="alert" aria-live="assertive" data-bs-autohide="true" data-bs-delay="7000">' +
             '<div class="toast-header">' +
-            '<i class="bi ' + getMeta(notif.type).icon + ' text-' + meta.color + ' me-2"></i>' +
+            '<i class="bi ' + meta.icon + ' text-' + meta.color + ' me-2"></i>' +
             '<strong class="me-auto">' + escHtml(notif.title) + '</strong>' +
             '<small class="text-muted ms-2">ora</small>' +
             '<button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>' +
-            '</div>' +
-            (notif.message ? '<div class="toast-body small text-muted">' + escHtml(notif.message) + (linkHtml ? '<br>' + linkHtml : '') + '</div>' : (linkHtml ? '<div class="toast-body">' + linkHtml + '</div>' : '')) +
-            '</div>';
+            '</div>' + bodyHtml + '</div>';
 
         var container = document.getElementById('toast-container');
         if (!container) return;
