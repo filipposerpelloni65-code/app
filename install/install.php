@@ -52,11 +52,27 @@ try {
     foreach ([
         "ALTER TABLE tickets ADD COLUMN dealer_id INT NULL",
         "ALTER TABLE tickets ADD COLUMN location_id INT NULL",
+        "ALTER TABLE tickets ADD COLUMN codice_concessionario VARCHAR(50) NULL",
         "ALTER TABLE spare_parts_requests ADD COLUMN dealer_id INT NULL",
         "ALTER TABLE spare_parts_requests ADD COLUMN location_id INT NULL",
+        "ALTER TABLE periferiche_guaste ADD COLUMN seriale_nuovo VARCHAR(100) NULL",
     ] as $alter) {
         try { $pdo->exec($alter); } catch (Exception $e) { /* column already exists */ }
     }
+
+    // ticket_uscite table (multiple technician visits per ticket)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ticket_uscite (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ticket_id INT NOT NULL,
+        tecnico_id INT NOT NULL,
+        data_uscita DATE NOT NULL,
+        note TEXT,
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+        FOREIGN KEY (tecnico_id) REFERENCES users(id),
+        FOREIGN KEY (created_by) REFERENCES users(id)
+    )");
 
     $pdo->exec("INSERT IGNORE INTO modules (name, slug, description, version, enabled, icon, sort_order) VALUES
         ('Gestione Ticket','tickets','Sistema di gestione ticket','1.0.0',1,'bi-ticket-detailed',1),

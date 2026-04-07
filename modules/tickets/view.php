@@ -60,10 +60,43 @@ $comments = $db->prepare("SELECT tc.*, u.full_name, u.role FROM ticket_comments 
 $comments->execute([$id]);
 $comments = $comments->fetchAll();
 
+// Handle add uscita (technician visit)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_uscita' && isTechnician()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
+    $data_uscita = trim($_POST['data_uscita'] ?? '');
+    $tecnico_id  = (int)($_POST['tecnico_id'] ?? $user['id']);
+    $note_uscita = trim($_POST['note_uscita'] ?? '');
+    if (!$data_uscita) { $errors[] = 'La data uscita è obbligatoria.'; }
+    if (!$errors) {
+        $db->prepare("INSERT INTO ticket_uscite (ticket_id, tecnico_id, data_uscita, note, created_by) VALUES (?,?,?,?,?)")
+           ->execute([$id, $tecnico_id, $data_uscita, $note_uscita ?: null, $user['id']]);
+        $db->prepare("UPDATE tickets SET updated_at=NOW() WHERE id=?")->execute([$id]);
+        logActivity($user['id'], 'add_uscita', 'ticket', $id, "Aggiunta uscita tecnico del $data_uscita");
+        header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#uscite');
+        exit;
+    }
+}
+
+// Handle delete uscita
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_uscita' && isTechnician()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
+    $uscita_id = (int)($_POST['uscita_id'] ?? 0);
+    if ($uscita_id && !$errors) {
+        $db->prepare("DELETE FROM ticket_uscite WHERE id=? AND ticket_id=?")->execute([$uscita_id, $id]);
+        header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#uscite');
+        exit;
+    }
+}
+
 // Fetch spare parts requests
 $partsRequests = $db->prepare("SELECT spr.*, sp.name as part_name, sp.sku, u.full_name as requester_name FROM spare_parts_requests spr JOIN spare_parts sp ON spr.part_id=sp.id JOIN users u ON spr.requested_by=u.id WHERE spr.ticket_id=?");
 $partsRequests->execute([$id]);
 $partsRequests = $partsRequests->fetchAll();
+
+// Fetch ticket uscite (technician visits)
+$uscite = $db->prepare("SELECT tu.*, u.full_name AS tecnico_name FROM ticket_uscite tu JOIN users u ON tu.tecnico_id=u.id WHERE tu.ticket_id=? ORDER BY tu.data_uscita ASC, tu.id ASC");
+$uscite->execute([$id]);
+$uscite = $uscite->fetchAll();
 
 // Fetch periferiche linked to this ticket
 $perifericheLinked = [];
@@ -161,6 +194,67 @@ include APP_ROOT . '/includes/header.php';
             <?php endif; ?>
         </div>
 
+        <!-- Uscite Tecnico -->
+        <?php if (isTechnician()): ?>
+        <div class="card border-0 shadow-sm mb-4" id="uscite">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-person-walking me-2 text-success"></i>Uscite Tecnico (<?= count($uscite) ?>)</h6>
+            </div>
+            <?php if ($uscite): ?>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>Data</th><th>Tecnico</th><th>Note</th><th></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($uscite as $u): ?>
+                    <tr>
+                        <td class="small fw-semibold text-nowrap"><?= formatDate($u['data_uscita'], 'd/m/Y') ?></td>
+                        <td class="small"><?= h($u['tecnico_name']) ?></td>
+                        <td class="small text-muted"><?= $u['note'] ? h($u['note']) : '-' ?></td>
+                        <td>
+                            <form method="post" onsubmit="return confirm('Eliminare questa uscita?')">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="delete_uscita">
+                                <input type="hidden" name="uscita_id" value="<?= $u['id'] ?>">
+                                <button type="submit" class="btn btn-outline-danger btn-sm py-0" title="Elimina"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+            <?php if (!in_array($ticket['status'], ['closed'])): ?>
+            <div class="card-footer bg-white">
+                <form method="post">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="add_uscita">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">Data Uscita <span class="text-danger">*</span></label>
+                            <input type="date" name="data_uscita" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">Tecnico</label>
+                            <?php $technicians = $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll(); ?>
+                            <select name="tecnico_id" class="form-select form-select-sm">
+                                <?php foreach ($technicians as $tech): ?>
+                                <option value="<?= $tech['id'] ?>" <?= $tech['id'] == $user['id'] ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">Note</label>
+                            <input type="text" name="note_uscita" class="form-control form-control-sm" placeholder="Intervento eseguito...">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-plus-lg me-1"></i>Aggiungi Uscita</button>
+                </form>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <!-- Spare Parts Requests -->
         <?php if ($partsRequests): ?>
         <div class="card border-0 shadow-sm mb-4">
@@ -231,6 +325,9 @@ include APP_ROOT . '/includes/header.php';
                     <dt class="col-sm-5">Stato</dt><dd class="col-sm-7"><?= getStatusBadge($ticket['status']) ?></dd>
                     <dt class="col-sm-5">Priorità</dt><dd class="col-sm-7"><?= getPriorityBadge($ticket['priority']) ?></dd>
                     <dt class="col-sm-5">Categoria</dt><dd class="col-sm-7"><?= $ticket['category_name'] ? h($ticket['category_name']) : '-' ?></dd>
+                    <?php if (!empty($ticket['codice_concessionario'])): ?>
+                    <dt class="col-sm-5">Rif. Concessionario</dt><dd class="col-sm-7 font-monospace"><?= h($ticket['codice_concessionario']) ?></dd>
+                    <?php endif; ?>
                     <dt class="col-sm-5">Creato da</dt><dd class="col-sm-7"><?= h($ticket['creator_name'] ?? '') ?></dd>
                     <dt class="col-sm-5">Assegnato a</dt><dd class="col-sm-7"><?= $ticket['assignee_name'] ? h($ticket['assignee_name']) : '<span class="text-muted">-</span>' ?></dd>
                     <?php if ($ticket['dealer_name']): ?>

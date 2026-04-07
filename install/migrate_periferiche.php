@@ -33,6 +33,37 @@ try {
         $steps[] = "- rapportini.periferica_id già presente (skip).";
     }
 
+    // 1b. Add codice_concessionario to tickets
+    try {
+        $pdo->exec("ALTER TABLE tickets ADD COLUMN codice_concessionario VARCHAR(50) NULL");
+        $steps[] = "✓ Colonna tickets.codice_concessionario aggiunta.";
+    } catch (Exception $e) {
+        $steps[] = "- tickets.codice_concessionario già presente (skip).";
+    }
+
+    // 1c. Add seriale_nuovo to periferiche_guaste
+    try {
+        $pdo->exec("ALTER TABLE periferiche_guaste ADD COLUMN seriale_nuovo VARCHAR(100) NULL");
+        $steps[] = "✓ Colonna periferiche_guaste.seriale_nuovo aggiunta.";
+    } catch (Exception $e) {
+        $steps[] = "- periferiche_guaste.seriale_nuovo già presente (skip).";
+    }
+
+    // 1d. Create ticket_uscite table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ticket_uscite (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ticket_id INT NOT NULL,
+        tecnico_id INT NOT NULL,
+        data_uscita DATE NOT NULL,
+        note TEXT,
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+        FOREIGN KEY (tecnico_id) REFERENCES users(id),
+        FOREIGN KEY (created_by) REFERENCES users(id)
+    )");
+    $steps[] = "✓ Tabella ticket_uscite creata (o già esistente).";
+
     // 2. Create periferiche_guaste table
     $pdo->exec("CREATE TABLE IF NOT EXISTS periferiche_guaste (
         id INT AUTO_INCREMENT PRIMARY KEY,

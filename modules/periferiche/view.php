@@ -77,7 +77,8 @@ include APP_ROOT . '/includes/header.php';
                         <tr><td class="fw-semibold bg-light">Tipo</td><td><?= h($p['tipo']) ?></td></tr>
                         <?php if ($p['marca']): ?><tr><td class="fw-semibold bg-light">Marca</td><td><?= h($p['marca']) ?></td></tr><?php endif; ?>
                         <?php if ($p['modello']): ?><tr><td class="fw-semibold bg-light">Modello</td><td><?= h($p['modello']) ?></td></tr><?php endif; ?>
-                        <?php if ($p['seriale']): ?><tr><td class="fw-semibold bg-light">Seriale</td><td class="font-monospace"><?= h($p['seriale']) ?></td></tr><?php endif; ?>
+                        <?php if ($p['seriale']): ?><tr><td class="fw-semibold bg-light">Seriale (guasto)</td><td class="font-monospace"><?= h($p['seriale']) ?></td></tr><?php endif; ?>
+                        <?php if ($p['seriale_nuovo']): ?><tr><td class="fw-semibold bg-light">Seriale Nuovo Installato</td><td class="font-monospace text-success"><?= h($p['seriale_nuovo']) ?></td></tr><?php endif; ?>
                         <tr><td class="fw-semibold bg-light">Data Ritiro</td><td><?= formatDate($p['data_ritiro'], 'd/m/Y') ?></td></tr>
                         <tr><td class="fw-semibold bg-light">Tecnico Ritiro</td><td><?= $p['tecnico_name'] ? h($p['tecnico_name']) : '<span class="text-muted">-</span>' ?></td></tr>
                         <?php if ($p['dealer_name']): ?>

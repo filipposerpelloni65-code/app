@@ -39,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $marca             = trim($_POST['marca'] ?? '');
     $modello           = trim($_POST['modello'] ?? '');
     $seriale           = trim($_POST['seriale'] ?? '');
+    $seriale_nuovo     = trim($_POST['seriale_nuovo'] ?? '');
     $descrizione_guasto = trim($_POST['descrizione_guasto'] ?? '');
     $dealer_id         = (int)($_POST['dealer_id'] ?? 0) ?: null;
     $location_id       = (int)($_POST['location_id'] ?? 0) ?: null;
@@ -62,13 +63,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $db->prepare("
                 INSERT INTO periferiche_guaste
-                    (codice, tipo, marca, modello, seriale, descrizione_guasto,
+                    (codice, tipo, marca, modello, seriale, seriale_nuovo, descrizione_guasto,
                      dealer_id, location_id, ticket_id, tecnico_ritiro_id,
                      data_ritiro, note_interne, created_by)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ");
             $stmt->execute([
-                $codice, $tipo, $marca, $modello, $seriale, $descrizione_guasto,
+                $codice, $tipo, $marca, $modello, $seriale, $seriale_nuovo, $descrizione_guasto,
                 $dealer_id, $location_id, $ticket_id, $tecnico_ritiro_id,
                 $data_ritiro, $note_interne, $user['id']
             ]);
@@ -148,22 +149,28 @@ include APP_ROOT . '/includes/header.php';
 
     <div class="row g-3 mb-3">
         <div class="col-md-4">
-            <label class="form-label fw-semibold">Numero Seriale</label>
-            <input type="text" name="seriale" class="form-control font-monospace" value="<?= h($_POST['seriale'] ?? '') ?>">
+            <label class="form-label fw-semibold">Seriale Periferica <span class="text-muted fw-normal">(guasta)</span></label>
+            <input type="text" name="seriale" class="form-control font-monospace" value="<?= h($_POST['seriale'] ?? '') ?>" placeholder="Seriale dispositivo ritirato">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Seriale Periferica Nuova</label>
+            <input type="text" name="seriale_nuovo" class="form-control font-monospace" value="<?= h($_POST['seriale_nuovo'] ?? '') ?>" placeholder="Seriale nuovo dispositivo installato">
+            <div class="form-text">Seriale del dispositivo sostitutivo installato in loco.</div>
         </div>
         <div class="col-md-4">
             <label class="form-label fw-semibold">Data Ritiro <span class="text-danger">*</span></label>
             <input type="date" name="data_ritiro" class="form-control" required value="<?= h($_POST['data_ritiro'] ?? date('Y-m-d')) ?>">
         </div>
-        <div class="col-md-4">
-            <label class="form-label fw-semibold">Tecnico Ritiro</label>
-            <select name="tecnico_ritiro_id" class="form-select">
-                <option value="">-- Nessuno --</option>
-                <?php foreach ($technicians as $tech): ?>
-                <option value="<?= $tech['id'] ?>" <?= (($_POST['tecnico_ritiro_id'] ?? $user['id']) == $tech['id']) ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Tecnico Ritiro</label>
+        <select name="tecnico_ritiro_id" class="form-select">
+            <option value="">-- Nessuno --</option>
+            <?php foreach ($technicians as $tech): ?>
+            <option value="<?= $tech['id'] ?>" <?= (($_POST['tecnico_ritiro_id'] ?? $user['id']) == $tech['id']) ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
+            <?php endforeach; ?>
+        </select>
     </div>
 
     <div class="mb-3">

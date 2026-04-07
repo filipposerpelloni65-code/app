@@ -28,18 +28,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $priority = $_POST['priority'] ?? 'medium';
     $category_id = (int)($_POST['category_id'] ?? 0) ?: null;
     $assigned_to = (int)($_POST['assigned_to'] ?? 0) ?: null;
+    $codice_concessionario = trim($_POST['codice_concessionario'] ?? '') ?: null;
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!in_array($status, ['open','in_progress','waiting','resolved','closed'])) $errors[] = 'Stato non valido.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
     if (!$errors) {
         $closedAt = in_array($status, ['resolved','closed']) && !$ticket['closed_at'] ? ', closed_at=NOW()' : '';
-        $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, category_id=?, assigned_to=?, updated_at=NOW()$closedAt WHERE id=?");
-        $stmt->execute([$title, $description, $status, $priority, $category_id, $assigned_to, $id]);
+        $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, category_id=?, assigned_to=?, codice_concessionario=?, updated_at=NOW()$closedAt WHERE id=?");
+        $stmt->execute([$title, $description, $status, $priority, $category_id, $assigned_to, $codice_concessionario, $id]);
         logActivity($user['id'], 'edit', 'ticket', $id, "Modificato ticket: $title");
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '&updated=1');
         exit;
     }
-    $ticket = array_merge($ticket, ['title'=>$title,'description'=>$description,'status'=>$status,'priority'=>$priority,'category_id'=>$category_id,'assigned_to'=>$assigned_to]);
+    $ticket = array_merge($ticket, ['title'=>$title,'description'=>$description,'status'=>$status,'priority'=>$priority,'category_id'=>$category_id,'assigned_to'=>$assigned_to,'codice_concessionario'=>$codice_concessionario]);
 }
 
 $categories = $db->query("SELECT * FROM ticket_categories ORDER BY name")->fetchAll();
@@ -70,6 +71,10 @@ include APP_ROOT . '/includes/header.php';
     <div class="mb-3">
         <label class="form-label fw-semibold">Titolo <span class="text-danger">*</span></label>
         <input type="text" name="title" class="form-control" required value="<?= h($ticket['title']) ?>">
+    </div>
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Codice Ticket Concessionario</label>
+        <input type="text" name="codice_concessionario" class="form-control font-monospace" value="<?= h($ticket['codice_concessionario'] ?? '') ?>" placeholder="Riferimento del concessionario">
     </div>
     <div class="mb-3">
         <label class="form-label fw-semibold">Descrizione</label>
