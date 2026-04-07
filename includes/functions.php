@@ -110,3 +110,12 @@ function redirect(string $url): void {
 function getTicketPrefix(): string {
     return getSetting('ticket_prefix', 'TKT');
 }
+
+function getRapportinoStatusBadge(string $status): string {
+    $badges = [
+        'draft'    => '<span class="badge bg-secondary">Bozza</span>',
+        'signed'   => '<span class="badge bg-success">Firmato</span>',
+        'archived' => '<span class="badge bg-dark">Archiviato</span>',
+    ];
+    return $badges[$status] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($status) . '</span>';
+}

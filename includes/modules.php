@@ -41,6 +41,7 @@ function getModuleUrl(string $slug): string {
         'users' => APP_URL . '/modules/users/index.php',
         'reports' => APP_URL . '/modules/reports/index.php',
         'settings' => APP_URL . '/modules/settings/index.php',
+        'rapportini' => APP_URL . '/modules/rapportini/index.php',
     ];
     return $urls[$slug] ?? '#';
 }
