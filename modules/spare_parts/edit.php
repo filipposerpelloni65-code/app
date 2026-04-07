@@ -116,9 +116,19 @@ include APP_ROOT . '/includes/header.php';
     </div>
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salva Modifiche</button>
-        <a href="<?= APP_URL ?>/modules/spare_parts/index.php" class="btn btn-light">Annulla</a>
+        <a href="<?= APP_URL ?>/modules/spare_parts/view.php?id=<?= $id ?>" class="btn btn-light">Annulla</a>
+        <?php if (isAdmin()): ?>
+        <span class="ms-auto"></span>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="if(confirm('Eliminare definitivamente questa parte?')){document.getElementById('deletePartForm').submit()}"><i class="bi bi-trash me-1"></i>Elimina</button>
+        <?php endif; ?>
     </div>
 </form>
+<?php if (isAdmin()): ?>
+<form id="deletePartForm" method="post" action="<?= APP_URL ?>/modules/spare_parts/view.php?id=<?= $id ?>" style="display:none">
+    <?= csrfField() ?>
+    <input type="hidden" name="action" value="delete">
+</form>
+<?php endif; ?>
 </div>
 </div>
 
