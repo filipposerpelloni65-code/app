@@ -137,15 +137,15 @@ include APP_ROOT . '/includes/header.php';
             <input type="date" name="data_ritiro" class="form-control" required value="<?= h($p['data_ritiro'] ?? '') ?>">
         </div>
     </div>
-        <div class="col-md-4">
-            <label class="form-label fw-semibold">Tecnico Ritiro</label>
-            <select name="tecnico_ritiro_id" class="form-select">
-                <option value="">-- Nessuno --</option>
-                <?php foreach ($technicians as $tech): ?>
-                <option value="<?= $tech['id'] ?>" <?= (($p['tecnico_ritiro_id'] ?? '') == $tech['id']) ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Tecnico Ritiro</label>
+        <select name="tecnico_ritiro_id" class="form-select">
+            <option value="">-- Nessuno --</option>
+            <?php foreach ($technicians as $tech): ?>
+            <option value="<?= $tech['id'] ?>" <?= (($p['tecnico_ritiro_id'] ?? '') == $tech['id']) ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
+            <?php endforeach; ?>
+        </select>
     </div>
 
     <div class="mb-3">
