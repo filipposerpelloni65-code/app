@@ -1,0 +1,230 @@
+<?php
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/../../includes/modules.php';
+
+requireLogin();
+if (!isModuleEnabled('tickets')) { header('Location: ' . APP_URL . '/dashboard.php'); exit; }
+
+$db = getDB();
+$user = currentUser();
+$id = (int)($_GET['id'] ?? 0);
+if (!$id) { header('Location: ' . APP_URL . '/modules/tickets/index.php'); exit; }
+
+$stmt = $db->prepare("SELECT t.*, uc.full_name as creator_name, ua.full_name as assignee_name, c.name as category_name FROM tickets t LEFT JOIN users uc ON t.created_by=uc.id LEFT JOIN users ua ON t.assigned_to=ua.id LEFT JOIN ticket_categories c ON t.category_id=c.id WHERE t.id=?");
+$stmt->execute([$id]);
+$ticket = $stmt->fetch();
+if (!$ticket) { header('Location: ' . APP_URL . '/modules/tickets/index.php'); exit; }
+
+// Access control: users can only see their own tickets
+if ($user['role'] === 'user' && $ticket['created_by'] != $user['id']) {
+    header('Location: ' . APP_URL . '/modules/tickets/index.php'); exit;
+}
+
+$errors = [];
+
+// Handle comment submit
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_comment') {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
+    $message = trim($_POST['message'] ?? '');
+    $is_internal = isset($_POST['is_internal']) && isTechnician() ? 1 : 0;
+    if (!$message) { $errors[] = 'Il commento non può essere vuoto.'; }
+    if (!$errors) {
+        $stmt2 = $db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, message, is_internal) VALUES (?,?,?,?)");
+        $stmt2->execute([$id, $user['id'], $message, $is_internal]);
+        // Update ticket updated_at
+        $db->prepare("UPDATE tickets SET updated_at=NOW() WHERE id=?")->execute([$id]);
+        logActivity($user['id'], 'comment', 'ticket', $id, 'Aggiunto commento');
+        header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#comments');
+        exit;
+    }
+}
+
+// Handle status change
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'change_status' && isTechnician()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
+    $newStatus = $_POST['new_status'] ?? '';
+    if (in_array($newStatus, ['open','in_progress','waiting','resolved','closed'])) {
+        $closedAt = in_array($newStatus, ['resolved','closed']) ? ', closed_at=NOW()' : '';
+        $db->prepare("UPDATE tickets SET status=?, updated_at=NOW()$closedAt WHERE id=?")->execute([$newStatus, $id]);
+        logActivity($user['id'], 'status_change', 'ticket', $id, "Stato cambiato in: $newStatus");
+        header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id);
+        exit;
+    }
+}
+
+// Fetch comments
+$comments = $db->prepare("SELECT tc.*, u.full_name, u.role FROM ticket_comments tc LEFT JOIN users u ON tc.user_id=u.id WHERE tc.ticket_id=? ORDER BY tc.created_at ASC");
+$comments->execute([$id]);
+$comments = $comments->fetchAll();
+
+// Fetch spare parts requests
+$partsRequests = $db->prepare("SELECT spr.*, sp.name as part_name, sp.sku, u.full_name as requester_name FROM spare_parts_requests spr JOIN spare_parts sp ON spr.part_id=sp.id JOIN users u ON spr.requested_by=u.id WHERE spr.ticket_id=?");
+$partsRequests->execute([$id]);
+$partsRequests = $partsRequests->fetchAll();
+
+define('PAGE_TITLE', 'Ticket ' . getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT));
+define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Ticket' => APP_URL.'/modules/tickets/index.php', 'Dettaglio' => '']);
+
+include APP_ROOT . '/includes/header.php';
+?>
+
+<?php if (isset($_GET['created'])): ?>
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle me-2"></i>Ticket creato con successo!
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php endif; ?>
+
+<?php if ($errors): ?>
+<div class="alert alert-danger"><ul class="mb-0"><?php foreach ($errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?></ul></div>
+<?php endif; ?>
+
+<div class="row g-4">
+    <!-- Main content -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="badge bg-light text-dark border me-2"><?= h(getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT)) ?></span>
+                    <strong><?= h($ticket['title']) ?></strong>
+                </div>
+                <?php if (isTechnician()): ?>
+                <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica</a>
+                <?php endif; ?>
+            </div>
+            <div class="card-body">
+                <p class="mb-0" style="white-space:pre-wrap"><?= h($ticket['description']) ?></p>
+            </div>
+        </div>
+
+        <!-- Comments -->
+        <div class="card border-0 shadow-sm mb-4" id="comments">
+            <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-chat-text me-2"></i>Commenti (<?= count($comments) ?>)</h6></div>
+            <div class="card-body p-0">
+                <?php if ($comments): ?>
+                    <?php foreach ($comments as $c): ?>
+                    <?php $isInternal = (int)$c['is_internal']; ?>
+                    <?php if ($isInternal && $user['role'] === 'user') continue; ?>
+                    <div class="p-3 border-bottom <?= $isInternal ? 'bg-warning bg-opacity-10' : '' ?>">
+                        <div class="d-flex gap-2 align-items-start">
+                            <div class="user-avatar user-avatar-sm flex-shrink-0"><?= strtoupper(substr($c['full_name'], 0, 1)) ?></div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between">
+                                    <strong class="small"><?= h($c['full_name']) ?></strong>
+                                    <div>
+                                        <?php if ($isInternal): ?><span class="badge bg-warning text-dark small me-1">Interno</span><?php endif; ?>
+                                        <span class="text-muted small"><?= formatDate($c['created_at']) ?></span>
+                                    </div>
+                                </div>
+                                <p class="mb-0 mt-1 small" style="white-space:pre-wrap"><?= h($c['message']) ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($comments)): ?>
+                    <div class="text-center text-muted py-4">Nessun commento</div>
+                    <?php endif; ?>
+                <?php else: ?>
+                <div class="p-4 text-center text-muted">Nessun commento ancora.</div>
+                <?php endif; ?>
+            </div>
+            <?php if (!in_array($ticket['status'], ['closed'])): ?>
+            <div class="card-footer bg-white">
+                <form method="post">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="add_comment">
+                    <div class="mb-2">
+                        <textarea name="message" class="form-control" rows="3" placeholder="Scrivi un commento..." required></textarea>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <?php if (isTechnician()): ?>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="is_internal" id="is_internal">
+                            <label class="form-check-label small" for="is_internal"><i class="bi bi-lock me-1"></i>Nota interna</label>
+                        </div>
+                        <?php else: ?><div></div><?php endif; ?>
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send me-1"></i>Invia</button>
+                    </div>
+                </form>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Spare Parts Requests -->
+        <?php if ($partsRequests): ?>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-tools me-2"></i>Parti di Ricambio Richieste</h6></div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>Parte</th><th>SKU</th><th>Qtà</th><th>Stato</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($partsRequests as $r): ?>
+                    <tr>
+                        <td><?= h($r['part_name']) ?></td>
+                        <td class="small text-muted"><?= h($r['sku']) ?></td>
+                        <td><?= (int)$r['quantity'] ?></td>
+                        <td><?= getRequestStatusBadge($r['status']) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- Sidebar info -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white"><h6 class="mb-0">Dettagli Ticket</h6></div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-5">Stato</dt><dd class="col-sm-7"><?= getStatusBadge($ticket['status']) ?></dd>
+                    <dt class="col-sm-5">Priorità</dt><dd class="col-sm-7"><?= getPriorityBadge($ticket['priority']) ?></dd>
+                    <dt class="col-sm-5">Categoria</dt><dd class="col-sm-7"><?= $ticket['category_name'] ? h($ticket['category_name']) : '-' ?></dd>
+                    <dt class="col-sm-5">Creato da</dt><dd class="col-sm-7"><?= h($ticket['creator_name'] ?? '') ?></dd>
+                    <dt class="col-sm-5">Assegnato a</dt><dd class="col-sm-7"><?= $ticket['assignee_name'] ? h($ticket['assignee_name']) : '<span class="text-muted">-</span>' ?></dd>
+                    <dt class="col-sm-5">Creato il</dt><dd class="col-sm-7"><?= formatDate($ticket['created_at']) ?></dd>
+                    <dt class="col-sm-5">Aggiornato</dt><dd class="col-sm-7"><?= formatDate($ticket['updated_at']) ?></dd>
+                    <?php if ($ticket['closed_at']): ?>
+                    <dt class="col-sm-5">Chiuso il</dt><dd class="col-sm-7"><?= formatDate($ticket['closed_at']) ?></dd>
+                    <?php endif; ?>
+                </dl>
+            </div>
+        </div>
+
+        <?php if (isTechnician()): ?>
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white"><h6 class="mb-0">Cambia Stato</h6></div>
+            <div class="card-body">
+                <form method="post">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="change_status">
+                    <select name="new_status" class="form-select form-select-sm mb-2">
+                        <option value="open" <?= $ticket['status']==='open'?'selected':'' ?>>Aperto</option>
+                        <option value="in_progress" <?= $ticket['status']==='in_progress'?'selected':'' ?>>In Lavorazione</option>
+                        <option value="waiting" <?= $ticket['status']==='waiting'?'selected':'' ?>>In Attesa</option>
+                        <option value="resolved" <?= $ticket['status']==='resolved'?'selected':'' ?>>Risolto</option>
+                        <option value="closed" <?= $ticket['status']==='closed'?'selected':'' ?>>Chiuso</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">Aggiorna Stato</button>
+                </form>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><h6 class="mb-0">Azioni</h6></div>
+            <div class="card-body d-grid gap-2">
+                <a href="<?= APP_URL ?>/modules/spare_parts/request.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-tools me-1"></i>Richiedi Parte</a>
+                <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica Ticket</a>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<style>.user-avatar-sm{width:28px;height:28px;font-size:.75rem;line-height:28px;border-radius:50%;background:var(--bs-primary);color:#fff;text-align:center;display:inline-block;}</style>
+
+<?php include APP_ROOT . '/includes/footer.php'; ?>
