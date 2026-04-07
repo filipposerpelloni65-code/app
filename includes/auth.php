@@ -68,6 +68,11 @@ function logout(): void {
     session_destroy();
 }
 
+function isLoggedIn(): bool {
+    startSecureSession();
+    return isset($_SESSION['user_id']);
+}
+
 function isAdmin(): bool {
     $user = currentUser();
     return $user && $user['role'] === 'admin';
