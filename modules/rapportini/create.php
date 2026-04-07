@@ -17,7 +17,8 @@ $user = currentUser();
 
 $errors = [];
 
-$preTicketId = (int)($_GET['ticket_id'] ?? 0);
+$preTicketId     = (int)($_GET['ticket_id'] ?? 0);
+$prePerifericaId = (int)($_GET['periferica_id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido. Riprova.'; }
@@ -30,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ticket_id        = (int)($_POST['ticket_id'] ?? 0) ?: null;
     $dealer_id        = (int)($_POST['dealer_id'] ?? 0) ?: null;
     $location_id      = (int)($_POST['location_id'] ?? 0) ?: null;
+    $periferica_id    = (int)($_POST['periferica_id'] ?? 0) ?: null;
     $customer_name    = trim($_POST['customer_name'] ?? '');
     $customer_contact = trim($_POST['customer_contact'] ?? '');
     $notes            = trim($_POST['notes'] ?? '');
@@ -43,16 +45,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("
             INSERT INTO rapportini
                 (title, work_description, parts_used, intervention_date, technician_id,
-                 ticket_id, dealer_id, location_id, customer_name, customer_contact, notes,
+                 ticket_id, dealer_id, location_id, periferica_id, customer_name, customer_contact, notes,
                  created_by, status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'draft')
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'draft')
         ");
         $stmt->execute([
             $title, $work_description, $parts_used, $intervention_date, $technician_id,
-            $ticket_id, $dealer_id, $location_id, $customer_name, $customer_contact, $notes,
+            $ticket_id, $dealer_id, $location_id, $periferica_id, $customer_name, $customer_contact, $notes,
             $user['id']
         ]);
         $newId = $db->lastInsertId();
+        // If linked to a periferica, update its rapportino_id
+        if ($periferica_id) {
+            $db->prepare("UPDATE periferiche_guaste SET rapportino_id=?, updated_at=NOW() WHERE id=?")->execute([$newId, $periferica_id]);
+        }
         logActivity($user['id'], 'create', 'rapportino', $newId, "Creato rapportino: $title");
         header('Location: ' . APP_URL . '/modules/rapportini/view.php?id=' . $newId . '&created=1');
         exit;
@@ -62,6 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $technicians   = $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll();
 $dealers       = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
 $tickets       = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT 100")->fetchAll();
+
+// Load periferiche for selector (only those in repairable states)
+$periferiche = [];
+if (isModuleEnabled('periferiche')) {
+    $pgSql = "SELECT p.id, p.codice, p.tipo, p.marca, p.modello FROM periferiche_guaste p WHERE p.rapportino_id IS NULL AND p.stato IN ('in_riparazione','riparata','in_diagnosi') ORDER BY p.codice";
+    $periferiche = $db->query($pgSql)->fetchAll();
+}
 
 $selectedDealer = (int)($_POST['dealer_id'] ?? 0);
 $dealerLocations = [];
@@ -156,6 +169,21 @@ include APP_ROOT . '/includes/header.php';
         </div>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
+
+    <?php if ($periferiche): ?>
+    <div class="mb-3">
+        <label class="form-label fw-semibold"><i class="bi bi-hdd-network me-1 text-primary"></i>Periferica Guasta Collegata</label>
+        <select name="periferica_id" class="form-select">
+            <option value="">-- Nessuna periferica --</option>
+            <?php foreach ($periferiche as $pg): ?>
+            <option value="<?= $pg['id'] ?>" <?= (($_POST['periferica_id'] ?? $prePerifericaId) == $pg['id']) ? 'selected' : '' ?>><?= h($pg['codice'].' — '.$pg['tipo'].($pg['marca'] ? ' '.$pg['marca'] : '').($pg['modello'] ? ' '.$pg['modello'] : '')) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <div class="form-text">Collega questo rapportino a una periferica in riparazione.</div>
+    </div>
+    <?php elseif ($prePerifericaId): ?>
+    <input type="hidden" name="periferica_id" value="<?= $prePerifericaId ?>">
     <?php endif; ?>
 
     <div class="mb-3">

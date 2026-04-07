@@ -36,6 +36,14 @@ $prStmt = $db->prepare("SELECT spr.*, sp.name as part_name, sp.sku, u.full_name 
 $prStmt->execute([$id]);
 $partsReqs = $prStmt->fetchAll();
 
+// Periferiche for this dealer
+$periferiche = [];
+if (isModuleEnabled('periferiche')) {
+    $pgStmt = $db->prepare("SELECT p.*, u.full_name AS tecnico_name FROM periferiche_guaste p LEFT JOIN users u ON p.tecnico_ritiro_id=u.id WHERE p.dealer_id=? ORDER BY p.created_at DESC LIMIT 15");
+    $pgStmt->execute([$id]);
+    $periferiche = $pgStmt->fetchAll();
+}
+
 include APP_ROOT . '/includes/header.php';
 ?>
 
@@ -181,6 +189,44 @@ include APP_ROOT . '/includes/header.php';
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Periferiche Guaste -->
+        <?php if (isModuleEnabled('periferiche')): ?>
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-hdd-network me-2 text-primary"></i>Periferiche Guaste (<?= count($periferiche) ?>)</h6>
+                <div class="d-flex gap-2">
+                    <a href="<?= APP_URL ?>/modules/periferiche/index.php?dealer_id=<?= $id ?>" class="btn btn-sm btn-outline-primary">Vedi tutte</a>
+                    <?php if (isTechnician()): ?>
+                    <a href="<?= APP_URL ?>/modules/periferiche/create.php?dealer_id=<?= $id ?>" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Registra</a>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <?php if ($periferiche): ?>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light"><tr><th>Codice</th><th>Dispositivo</th><th>Stato</th><th>Tecnico</th><th>Ritiro</th><th></th></tr></thead>
+                        <tbody>
+                        <?php foreach ($periferiche as $pg): ?>
+                        <tr>
+                            <td><a href="<?= APP_URL ?>/modules/periferiche/view.php?id=<?= $pg['id'] ?>" class="fw-bold text-primary text-decoration-none font-monospace small"><?= h($pg['codice']) ?></a></td>
+                            <td class="small"><?= h($pg['tipo']) ?><?= $pg['marca'] ? ' '.h($pg['marca']) : '' ?></td>
+                            <td><?= getPerifericaStatoBadge($pg['stato']) ?></td>
+                            <td class="small"><?= $pg['tecnico_name'] ? h($pg['tecnico_name']) : '-' ?></td>
+                            <td class="small text-muted"><?= formatDate($pg['data_ritiro'], 'd/m/Y') ?></td>
+                            <td><a href="<?= APP_URL ?>/modules/periferiche/view.php?id=<?= $pg['id'] ?>" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                <div class="p-4 text-center text-muted small"><i class="bi bi-hdd-network fs-2 d-block mb-2 opacity-50"></i>Nessuna periferica per questo concessionario.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 

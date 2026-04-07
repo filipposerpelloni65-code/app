@@ -62,10 +62,9 @@ try {
     // 3. Insert module entry
     $pdo->exec("INSERT IGNORE INTO modules (name, slug, description, version, enabled, icon, sort_order)
         VALUES ('Periferiche','periferiche','Gestione periferiche guaste e flusso riparazione','1.0.0',1,'bi-hdd-network',5)");
-    // Update sort_order of existing modules to make room
-    $pdo->exec("UPDATE modules SET sort_order=6 WHERE slug='users' AND sort_order=5");
-    $pdo->exec("UPDATE modules SET sort_order=7 WHERE slug='reports' AND sort_order=6");
-    $pdo->exec("UPDATE modules SET sort_order=8 WHERE slug='settings' AND sort_order=7");
+    // Make room for periferiche at sort_order=5: push all modules with sort_order >= 5 up by 1,
+    // but only if periferiche isn't already occupying that slot.
+    $pdo->exec("UPDATE modules SET sort_order = sort_order + 1 WHERE slug != 'periferiche' AND sort_order >= 5 AND slug IN ('users','reports','settings')");
     $steps[] = "✓ Modulo 'periferiche' registrato.";
 
     echo "Migrazione completata:\n";

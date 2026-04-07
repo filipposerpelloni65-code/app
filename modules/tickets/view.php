@@ -65,6 +65,14 @@ $partsRequests = $db->prepare("SELECT spr.*, sp.name as part_name, sp.sku, u.ful
 $partsRequests->execute([$id]);
 $partsRequests = $partsRequests->fetchAll();
 
+// Fetch periferiche linked to this ticket
+$perifericheLinked = [];
+if (isModuleEnabled('periferiche')) {
+    $pgStmt = $db->prepare("SELECT p.*, u.full_name AS tecnico_name FROM periferiche_guaste p LEFT JOIN users u ON p.tecnico_ritiro_id=u.id WHERE p.ticket_id=? ORDER BY p.created_at DESC");
+    $pgStmt->execute([$id]);
+    $perifericheLinked = $pgStmt->fetchAll();
+}
+
 define('PAGE_TITLE', 'Ticket ' . getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT));
 define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Ticket' => APP_URL.'/modules/tickets/index.php', 'Dettaglio' => '']);
 
@@ -155,7 +163,7 @@ include APP_ROOT . '/includes/header.php';
 
         <!-- Spare Parts Requests -->
         <?php if ($partsRequests): ?>
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-tools me-2"></i>Parti di Ricambio Richieste</h6></div>
             <div class="table-responsive">
                 <table class="table table-sm mb-0">
@@ -172,6 +180,44 @@ include APP_ROOT . '/includes/header.php';
                     </tbody>
                 </table>
             </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Periferiche Collegate -->
+        <?php if (isModuleEnabled('periferiche')): ?>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-hdd-network me-2 text-primary"></i>Periferiche Collegate (<?= count($perifericheLinked) ?>)</h6>
+                <?php if (isTechnician()): ?>
+                <a href="<?= APP_URL ?>/modules/periferiche/create.php?ticket_id=<?= $id ?><?= $ticket['dealer_id'] ? '&dealer_id='.$ticket['dealer_id'] : '' ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg me-1"></i>Registra Periferica</a>
+                <?php endif; ?>
+            </div>
+            <?php if ($perifericheLinked): ?>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>Codice</th><th>Dispositivo</th><th>Stato</th><th>Tecnico</th><th>Ritiro</th><th></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($perifericheLinked as $pg): ?>
+                    <tr>
+                        <td><a href="<?= APP_URL ?>/modules/periferiche/view.php?id=<?= $pg['id'] ?>" class="fw-bold text-primary text-decoration-none font-monospace small"><?= h($pg['codice']) ?></a></td>
+                        <td class="small"><?= h($pg['tipo']) ?><?= $pg['marca'] ? ' '.h($pg['marca']) : '' ?><?= $pg['modello'] ? ' '.h($pg['modello']) : '' ?></td>
+                        <td><?= getPerifericaStatoBadge($pg['stato']) ?></td>
+                        <td class="small"><?= $pg['tecnico_name'] ? h($pg['tecnico_name']) : '-' ?></td>
+                        <td class="small text-muted"><?= formatDate($pg['data_ritiro'], 'd/m/Y') ?></td>
+                        <td><a href="<?= APP_URL ?>/modules/periferiche/view.php?id=<?= $pg['id'] ?>" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="card-body text-center text-muted small py-3">
+                <i class="bi bi-hdd-network d-block mb-1 fs-4 opacity-50"></i>Nessuna periferica registrata per questo ticket.
+                <?php if (isTechnician()): ?>
+                <div class="mt-2"><a href="<?= APP_URL ?>/modules/periferiche/create.php?ticket_id=<?= $id ?><?= $ticket['dealer_id'] ? '&dealer_id='.$ticket['dealer_id'] : '' ?>">Registra la prima periferica</a></div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
     </div>

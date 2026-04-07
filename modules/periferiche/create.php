@@ -22,7 +22,7 @@ $success = false;
 $preTicketId = (int)($_GET['ticket_id'] ?? 0);
 $preDealerId = (int)($_GET['dealer_id'] ?? 0);
 
-// Generate next code suggestion
+// Generate next code suggestion (best-effort; UNIQUE constraint is the real guard)
 function nextPerifericaCodice($db): string {
     $row = $db->query("SELECT codice FROM periferiche_guaste ORDER BY id DESC LIMIT 1")->fetch();
     if ($row && preg_match('/PG-(\d+)$/', $row['codice'], $m)) {
@@ -51,26 +51,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$tipo)        $errors[] = 'Il tipo dispositivo è obbligatorio.';
     if (!$data_ritiro) $errors[] = 'La data di ritiro è obbligatoria.';
 
-    // Check unique codice
+    // Check unique codice (UNIQUE constraint is the definitive guard against concurrent inserts)
     if ($codice && !$errors) {
         $chk = $db->prepare("SELECT id FROM periferiche_guaste WHERE codice=?");
         $chk->execute([$codice]);
-        if ($chk->fetch()) $errors[] = 'Il codice ' . h($codice) . ' è già utilizzato.';
+        if ($chk->fetch()) $errors[] = 'Il codice ' . h($codice) . ' è già utilizzato. Scegli un codice diverso.';
     }
 
     if (!$errors) {
-        $stmt = $db->prepare("
-            INSERT INTO periferiche_guaste
-                (codice, tipo, marca, modello, seriale, descrizione_guasto,
-                 dealer_id, location_id, ticket_id, tecnico_ritiro_id,
-                 data_ritiro, note_interne, created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ");
-        $stmt->execute([
-            $codice, $tipo, $marca, $modello, $seriale, $descrizione_guasto,
-            $dealer_id, $location_id, $ticket_id, $tecnico_ritiro_id,
-            $data_ritiro, $note_interne, $user['id']
-        ]);
+        try {
+            $stmt = $db->prepare("
+                INSERT INTO periferiche_guaste
+                    (codice, tipo, marca, modello, seriale, descrizione_guasto,
+                     dealer_id, location_id, ticket_id, tecnico_ritiro_id,
+                     data_ritiro, note_interne, created_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ");
+            $stmt->execute([
+                $codice, $tipo, $marca, $modello, $seriale, $descrizione_guasto,
+                $dealer_id, $location_id, $ticket_id, $tecnico_ritiro_id,
+                $data_ritiro, $note_interne, $user['id']
+            ]);
+        } catch (PDOException $ex) {
+            // Duplicate entry (race condition on UNIQUE codice)
+            if ($ex->getCode() === '23000') {
+                $errors[] = 'Il codice ' . h($codice) . ' è già in uso (inserito concorrentemente). Modifica il codice e riprova.';
+            } else {
+                throw $ex;
+            }
+        }
+    }
+    if (!$errors) {
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'create', 'periferica', $newId, "Registrata periferica: $codice ($tipo)");
         header('Location: ' . APP_URL . '/modules/periferiche/view.php?id=' . $newId . '&created=1');

@@ -20,13 +20,17 @@ $stmt = $db->prepare("
         uc.full_name AS creator_name,
         d.name AS dealer_name, d.address AS dealer_address, d.city AS dealer_city,
         dl.name AS location_name,
-        t.title AS ticket_title
+        t.title AS ticket_title,
+        pg.codice AS periferica_codice, pg.tipo AS periferica_tipo,
+        pg.marca AS periferica_marca, pg.modello AS periferica_modello,
+        pg.seriale AS periferica_seriale, pg.stato AS periferica_stato
     FROM rapportini r
     LEFT JOIN users ut ON r.technician_id = ut.id
     LEFT JOIN users uc ON r.created_by = uc.id
     LEFT JOIN dealers d ON r.dealer_id = d.id
     LEFT JOIN dealer_locations dl ON r.location_id = dl.id
     LEFT JOIN tickets t ON r.ticket_id = t.id
+    LEFT JOIN periferiche_guaste pg ON r.periferica_id = pg.id
     WHERE r.id = ?
 ");
 $stmt->execute([$id]);
@@ -225,6 +229,26 @@ include APP_ROOT . '/includes/header.php';
                     </tbody>
                 </table>
 
+                <!-- Periferica in Riparazione -->
+                <?php if ($r['periferica_id'] && $r['periferica_codice']): ?>
+                <div class="sec-title"><i class="bi bi-hdd-network me-1"></i>Periferica in Riparazione</div>
+                <table class="info-table table table-sm table-bordered">
+                    <tbody>
+                        <tr><td class="fw-semibold bg-light" style="width:35%">Codice</td><td class="font-monospace"><?= h($r['periferica_codice']) ?></td></tr>
+                        <tr><td class="fw-semibold bg-light">Tipo</td><td><?= h($r['periferica_tipo']) ?></td></tr>
+                        <?php if ($r['periferica_marca'] || $r['periferica_modello']): ?>
+                        <tr><td class="fw-semibold bg-light">Marca / Modello</td><td><?= h(trim($r['periferica_marca'].' '.$r['periferica_modello'])) ?></td></tr>
+                        <?php endif; ?>
+                        <?php if ($r['periferica_seriale']): ?>
+                        <tr><td class="fw-semibold bg-light">Seriale</td><td class="font-monospace"><?= h($r['periferica_seriale']) ?></td></tr>
+                        <?php endif; ?>
+                        <?php if ($r['periferica_stato']): ?>
+                        <tr><td class="fw-semibold bg-light">Stato Periferica</td><td><?= getPerifericaStatoBadge($r['periferica_stato']) ?></td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+
                 <!-- Descrizione Lavoro -->
                 <div class="sec-title"><i class="bi bi-tools me-1"></i>Descrizione Lavoro Eseguito</div>
                 <div class="work-box border rounded p-3 mb-3" style="white-space:pre-wrap"><?= h($r['work_description']) ?></div>
@@ -278,6 +302,12 @@ include APP_ROOT . '/includes/header.php';
                     <dt class="col-sm-5">Firmato il</dt><dd class="col-sm-7"><?= formatDate($r['signed_at'], 'd/m/Y H:i') ?></dd>
                     <?php endif; ?>
                 </dl>
+                <?php if ($r['periferica_id'] && $r['periferica_codice']): ?>
+                <div class="mt-3 pt-3 border-top">
+                    <div class="small text-muted mb-1">Periferica Collegata</div>
+                    <a href="<?= APP_URL ?>/modules/periferiche/view.php?id=<?= $r['periferica_id'] ?>" class="btn btn-sm btn-outline-primary w-100"><i class="bi bi-hdd-network me-1"></i><?= h($r['periferica_codice']) ?> — <?= h($r['periferica_tipo']) ?></a>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 

@@ -53,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ticket_id        = (int)($_POST['ticket_id'] ?? 0) ?: null;
     $dealer_id        = (int)($_POST['dealer_id'] ?? 0) ?: null;
     $location_id      = (int)($_POST['location_id'] ?? 0) ?: null;
+    $periferica_id    = (int)($_POST['periferica_id'] ?? 0) ?: null;
     $customer_name    = trim($_POST['customer_name'] ?? '');
     $customer_contact = trim($_POST['customer_contact'] ?? '');
     $notes            = trim($_POST['notes'] ?? '');
@@ -66,15 +67,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("
             UPDATE rapportini SET
                 title=?, work_description=?, parts_used=?, intervention_date=?,
-                technician_id=?, ticket_id=?, dealer_id=?, location_id=?,
+                technician_id=?, ticket_id=?, dealer_id=?, location_id=?, periferica_id=?,
                 customer_name=?, customer_contact=?, notes=?, updated_at=NOW()
             WHERE id=? AND status='draft'
         ");
         $stmt->execute([
             $title, $work_description, $parts_used, $intervention_date,
-            $technician_id, $ticket_id, $dealer_id, $location_id,
+            $technician_id, $ticket_id, $dealer_id, $location_id, $periferica_id,
             $customer_name, $customer_contact, $notes, $id
         ]);
+        // Sync periferica back-link
+        if ($periferica_id) {
+            $db->prepare("UPDATE periferiche_guaste SET rapportino_id=?, updated_at=NOW() WHERE id=?")->execute([$id, $periferica_id]);
+        }
         logActivity($user['id'], 'edit', 'rapportino', $id, "Modificato rapportino: $title");
         header('Location: ' . APP_URL . '/modules/rapportini/view.php?id=' . $id . '&saved=1');
         exit;
@@ -87,6 +92,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $technicians = $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll();
 $dealers     = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
 $tickets     = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT 100")->fetchAll();
+
+// Periferiche available for linking
+$periferiche = [];
+if (isModuleEnabled('periferiche')) {
+    $pgSql = "SELECT p.id, p.codice, p.tipo, p.marca, p.modello FROM periferiche_guaste p WHERE (p.rapportino_id IS NULL OR p.rapportino_id=?) AND p.stato IN ('in_riparazione','riparata','in_diagnosi') ORDER BY p.codice";
+    $pgStmt = $db->prepare($pgSql);
+    $pgStmt->execute([$id]);
+    $periferiche = $pgStmt->fetchAll();
+}
 
 $selectedDealer = (int)($_POST['dealer_id'] ?? $rapportino['dealer_id'] ?? 0);
 $dealerLocations = [];
@@ -180,6 +194,18 @@ include APP_ROOT . '/includes/header.php';
             </select>
         </div>
         <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($periferiche): ?>
+    <div class="mb-3">
+        <label class="form-label fw-semibold"><i class="bi bi-hdd-network me-1 text-primary"></i>Periferica Guasta Collegata</label>
+        <select name="periferica_id" class="form-select">
+            <option value="">-- Nessuna periferica --</option>
+            <?php foreach ($periferiche as $pg): ?>
+            <option value="<?= $pg['id'] ?>" <?= (($rapportino['periferica_id'] ?? '') == $pg['id']) ? 'selected' : '' ?>><?= h($pg['codice'].' — '.$pg['tipo'].($pg['marca'] ? ' '.$pg['marca'] : '').($pg['modello'] ? ' '.$pg['modello'] : '')) ?></option>
+            <?php endforeach; ?>
+        </select>
     </div>
     <?php endif; ?>
 
