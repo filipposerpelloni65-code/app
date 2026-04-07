@@ -119,3 +119,29 @@ function getRapportinoStatusBadge(string $status): string {
     ];
     return $badges[$status] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($status) . '</span>';
 }
+
+function getPerifericaStatoBadge(string $stato): string {
+    $badges = [
+        'in_giacenza'     => '<span class="badge bg-secondary">In Giacenza</span>',
+        'in_diagnosi'     => '<span class="badge bg-info text-dark">In Diagnosi</span>',
+        'in_riparazione'  => '<span class="badge bg-warning text-dark">In Riparazione</span>',
+        'riparata'        => '<span class="badge bg-success">Riparata</span>',
+        'non_riparabile'  => '<span class="badge bg-danger">Non Riparabile</span>',
+        'restituita'      => '<span class="badge bg-primary">Restituita</span>',
+        'rottamata'       => '<span class="badge bg-dark">Rottamata</span>',
+    ];
+    return $badges[$stato] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($stato) . '</span>';
+}
+
+function getPerifericaStatoLabel(string $stato): string {
+    $labels = [
+        'in_giacenza'     => 'In Giacenza',
+        'in_diagnosi'     => 'In Diagnosi',
+        'in_riparazione'  => 'In Riparazione',
+        'riparata'        => 'Riparata',
+        'non_riparabile'  => 'Non Riparabile',
+        'restituita'      => 'Restituita',
+        'rottamata'       => 'Rottamata',
+    ];
+    return $labels[$stato] ?? $stato;
+}

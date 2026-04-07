@@ -40,7 +40,8 @@ try {
         "CREATE TABLE IF NOT EXISTS dealers (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, code VARCHAR(50) NOT NULL UNIQUE, email VARCHAR(100), phone VARCHAR(50), address VARCHAR(255), city VARCHAR(100), region VARCHAR(100), active TINYINT(1) NOT NULL DEFAULT 1, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
         "CREATE TABLE IF NOT EXISTS dealer_locations (id INT AUTO_INCREMENT PRIMARY KEY, dealer_id INT NOT NULL, name VARCHAR(255) NOT NULL, code VARCHAR(50), address VARCHAR(255), city VARCHAR(100), phone VARCHAR(50), email VARCHAR(100), contact_person VARCHAR(100), active TINYINT(1) NOT NULL DEFAULT 1, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE)",
         "CREATE TABLE IF NOT EXISTS dealer_users (dealer_id INT NOT NULL, location_id INT, user_id INT NOT NULL, PRIMARY KEY (dealer_id, user_id), FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
-        "CREATE TABLE IF NOT EXISTS rapportini (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, work_description TEXT NOT NULL, parts_used TEXT, notes TEXT, intervention_date DATE NOT NULL, technician_id INT NOT NULL, ticket_id INT NULL, dealer_id INT NULL, location_id INT NULL, customer_name VARCHAR(100), customer_contact VARCHAR(100), status ENUM('draft','signed','archived') NOT NULL DEFAULT 'draft', signature_data MEDIUMTEXT, signed_by_name VARCHAR(100), signed_at TIMESTAMP NULL, created_by INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY (technician_id) REFERENCES users(id), FOREIGN KEY (created_by) REFERENCES users(id))"
+        "CREATE TABLE IF NOT EXISTS rapportini (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, work_description TEXT NOT NULL, parts_used TEXT, notes TEXT, intervention_date DATE NOT NULL, technician_id INT NOT NULL, ticket_id INT NULL, dealer_id INT NULL, location_id INT NULL, periferica_id INT NULL, customer_name VARCHAR(100), customer_contact VARCHAR(100), status ENUM('draft','signed','archived') NOT NULL DEFAULT 'draft', signature_data MEDIUMTEXT, signed_by_name VARCHAR(100), signed_at TIMESTAMP NULL, created_by INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY (technician_id) REFERENCES users(id), FOREIGN KEY (created_by) REFERENCES users(id))",
+        "CREATE TABLE IF NOT EXISTS periferiche_guaste (id INT AUTO_INCREMENT PRIMARY KEY, codice VARCHAR(30) NOT NULL UNIQUE, tipo VARCHAR(100) NOT NULL, marca VARCHAR(100), modello VARCHAR(100), seriale VARCHAR(100), descrizione_guasto TEXT, dealer_id INT NULL, location_id INT NULL, ticket_id INT NULL, tecnico_ritiro_id INT NULL, data_ritiro DATE NOT NULL, stato ENUM('in_giacenza','in_diagnosi','in_riparazione','riparata','non_riparabile','restituita','rottamata') NOT NULL DEFAULT 'in_giacenza', note_diagnosi TEXT, note_interne TEXT, rapportino_id INT NULL, created_by INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY (tecnico_ritiro_id) REFERENCES users(id), FOREIGN KEY (created_by) REFERENCES users(id))"
     ];
 
     foreach ($tables as $sql) {
@@ -62,9 +63,10 @@ try {
         ('Parti di Ricambio','spare_parts','Gestione magazzino parti di ricambio','1.0.0',1,'bi-tools',2),
         ('Concessionari','dealers','Gestione concessionari e punti vendita','1.0.0',1,'bi-shop',3),
         ('Rapportini','rapportini','Rapportini di lavoro con firma digitale e PDF','1.0.0',1,'bi-file-earmark-text',4),
-        ('Utenti','users','Gestione utenti del sistema','1.0.0',1,'bi-people',5),
-        ('Report','reports','Report e statistiche','1.0.0',1,'bi-bar-chart',6),
-        ('Impostazioni','settings','Configurazione sistema','1.0.0',1,'bi-gear',7)");
+        ('Periferiche','periferiche','Gestione periferiche guaste e flusso riparazione','1.0.0',1,'bi-hdd-network',5),
+        ('Utenti','users','Gestione utenti del sistema','1.0.0',1,'bi-people',6),
+        ('Report','reports','Report e statistiche','1.0.0',1,'bi-bar-chart',7),
+        ('Impostazioni','settings','Configurazione sistema','1.0.0',1,'bi-gear',8)");
 
     $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES
         ('company_name','" . addslashes($companyName) . "'),
