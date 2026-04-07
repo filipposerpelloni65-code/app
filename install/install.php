@@ -15,10 +15,10 @@ try {
     $name = $_SESSION['db_name'] ?? '';
     $user = $_SESSION['db_user'] ?? '';
     $pass = $_SESSION['db_pass'] ?? '';
-    $adminUser = $_SESSION['admin_user'] ?? 'admin';
+    $adminUser = $_SESSION['admin_username'] ?? 'admin';
     $adminEmail = $_SESSION['admin_email'] ?? '';
-    $adminPass = $_SESSION['admin_pass'] ?? '';
-    $companyName = $_SESSION['company_name'] ?? 'HelpDesk Aziendale';
+    $adminPass = $_SESSION['admin_password'] ?? '';
+    $companyName = $_SESSION['app_name'] ?? 'HelpDesk Aziendale';
 
     if (!$name || !$user) throw new Exception('Credenziali DB mancanti dalla sessione');
 
