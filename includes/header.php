@@ -96,12 +96,12 @@ $notifCounts = $currentUser ? getNotificationCounts() : [];
                 </ol>
             </nav>
             <!-- Global Search -->
-            <div class="me-2 d-none d-md-block" style="width:260px">
+            <div class="me-2 d-none d-md-block position-relative" style="width:260px">
                 <div class="input-group input-group-sm">
                     <input type="text" id="globalSearchInput" class="form-control" placeholder="Cerca ticket, ricambi, periferiche...">
                     <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
                 </div>
-                <div id="globalSearchResults" class="position-absolute bg-white border rounded shadow-sm" style="width:260px;z-index:1050;display:none;max-height:320px;overflow-y:auto;top:52px;right:90px;"></div>
+                <div id="globalSearchResults" class="position-absolute bg-white border rounded shadow-sm w-100" style="z-index:1050;display:none;max-height:320px;overflow-y:auto;top:calc(100% + 4px);left:0;"></div>
             </div>
             <span class="badge bg-<?= $currentUser['role'] === 'admin' ? 'danger' : ($currentUser['role'] === 'technician' ? 'warning text-dark' : 'primary') ?> ms-2">
                 <?= h(ucfirst($currentUser['role'])) ?>

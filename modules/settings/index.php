@@ -151,7 +151,7 @@ include APP_ROOT . '/includes/header.php';
             <div class="row g-3 mb-4">
                 <div class="col-md-3">
                     <label class="form-label">Giorni per Auto-Chiusura</label>
-                    <input type="number" name="auto_close_days" class="form-control" min="1" max="365" value="<?= h($settings['auto_close_days'] ?? '7') ?>">
+                    <input type="number" name="auto_close_days" class="form-control" min="1" max="365" step="1" value="<?= h($settings['auto_close_days'] ?? '7') ?>">
                     <div class="form-text">Ticket "risolti" da N giorni vengono chiusi automaticamente.</div>
                 </div>
                 <div class="col-md-5">

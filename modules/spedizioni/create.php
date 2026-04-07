@@ -58,7 +58,7 @@ if ($selectedDealer) {
 // Open tickets
 $openTickets = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed','resolved') ORDER BY created_at DESC LIMIT 100")->fetchAll();
 
-// Pending parts requests
+// Approved spare parts requests (ready to ship)
 $pendingReqs = $db->query("SELECT spr.id, sp.name as part_name, spr.quantity FROM spare_parts_requests spr JOIN spare_parts sp ON spr.part_id=sp.id WHERE spr.status='approved' ORDER BY spr.created_at DESC LIMIT 50")->fetchAll();
 
 include APP_ROOT . '/includes/header.php';

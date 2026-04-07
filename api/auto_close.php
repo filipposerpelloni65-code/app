@@ -19,18 +19,14 @@ header('Content-Type: application/json');
 $expectedSecret = getSetting('auto_close_secret', '');
 $providedSecret = $_GET['secret'] ?? $_SERVER['HTTP_X_AUTO_CLOSE_SECRET'] ?? '';
 
-if ($expectedSecret !== '' && !hash_equals($expectedSecret, $providedSecret)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Forbidden']);
-    exit;
-}
-
-// Only allow from CLI or if secret matches
-$isCli = php_sapi_name() === 'cli';
-if (!$isCli && $expectedSecret === '') {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Secret not configured. Set auto_close_secret in settings.']);
-    exit;
+// Secret must be configured (non-empty) and must match; CLI runs are always allowed
+if (php_sapi_name() !== 'cli') {
+    if ($expectedSecret === '' || !hash_equals($expectedSecret, $providedSecret)) {
+        http_response_code(403);
+        $reason = $expectedSecret === '' ? 'Secret not configured. Set auto_close_secret in Settings.' : 'Invalid secret.';
+        echo json_encode(['success' => false, 'error' => $reason]);
+        exit;
+    }
 }
 
 $days = max(1, (int)getSetting('auto_close_days', '7'));

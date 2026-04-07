@@ -22,7 +22,6 @@ $stmt = $db->prepare("
     LEFT JOIN dealers d ON s.dealer_id = d.id
     LEFT JOIN dealer_locations dl ON s.location_id = dl.id
     LEFT JOIN tickets t ON s.ticket_id = t.id
-    LEFT JOIN users u ON s.spare_parts_request_id = u.id
     LEFT JOIN users uc ON s.created_by = uc.id
     WHERE s.id = ?
 ");
