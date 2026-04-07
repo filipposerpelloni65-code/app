@@ -112,16 +112,21 @@ include APP_ROOT . '/includes/header.php';
                         <td class="small text-muted"><?= formatDate($r['created_at'], 'd/m/Y') ?></td>
                         <?php if (isAdmin()): ?>
                         <td>
-                            <form method="post" class="d-inline">
-                                <?= csrfField() ?>
-                                <input type="hidden" name="request_id" value="<?= $r['id'] ?>">
-                                <select name="new_status" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
-                                    <option value="pending" <?= $r['status']==='pending'?'selected':'' ?>>In Attesa</option>
-                                    <option value="approved" <?= $r['status']==='approved'?'selected':'' ?>>Approvata</option>
-                                    <option value="rejected" <?= $r['status']==='rejected'?'selected':'' ?>>Rifiutata</option>
-                                    <option value="fulfilled" <?= $r['status']==='fulfilled'?'selected':'' ?>>Evasa</option>
-                                </select>
-                            </form>
+                            <div class="d-flex gap-1 align-items-center">
+                                <form method="post" class="d-inline">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="request_id" value="<?= $r['id'] ?>">
+                                    <select name="new_status" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
+                                        <option value="pending" <?= $r['status']==='pending'?'selected':'' ?>>In Attesa</option>
+                                        <option value="approved" <?= $r['status']==='approved'?'selected':'' ?>>Approvata</option>
+                                        <option value="rejected" <?= $r['status']==='rejected'?'selected':'' ?>>Rifiutata</option>
+                                        <option value="fulfilled" <?= $r['status']==='fulfilled'?'selected':'' ?>>Evasa</option>
+                                    </select>
+                                </form>
+                                <?php if (in_array($r['status'], ['approved','pending']) && isModuleEnabled('spedizioni')): ?>
+                                <a href="<?= APP_URL ?>/modules/spedizioni/create.php?request_id=<?= $r['id'] ?><?= $r['ticket_id'] ? '&ticket_id='.$r['ticket_id'] : '' ?>" class="btn btn-outline-primary btn-sm py-0" title="Crea Spedizione"><i class="bi bi-truck"></i></a>
+                                <?php endif; ?>
+                            </div>
                         </td>
                         <?php endif; ?>
                     </tr>

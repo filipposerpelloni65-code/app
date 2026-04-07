@@ -93,6 +93,14 @@ $partsRequests = $db->prepare("SELECT spr.*, sp.name as part_name, sp.sku, u.ful
 $partsRequests->execute([$id]);
 $partsRequests = $partsRequests->fetchAll();
 
+// Fetch shipments linked to this ticket
+$spedizioniLinked = [];
+if (isModuleEnabled('spedizioni')) {
+    $spedStmt = $db->prepare("SELECT s.*, u.full_name as creator_name FROM spedizioni s LEFT JOIN users u ON s.created_by=u.id WHERE s.ticket_id=? ORDER BY s.created_at DESC");
+    $spedStmt->execute([$id]);
+    $spedizioniLinked = $spedStmt->fetchAll();
+}
+
 // Fetch ticket uscite (technician visits)
 $uscite = $db->prepare("SELECT tu.*, u.full_name AS tecnico_name FROM ticket_uscite tu JOIN users u ON tu.tecnico_id=u.id WHERE tu.ticket_id=? ORDER BY tu.data_uscita ASC, tu.id ASC");
 $uscite->execute([$id]);
@@ -277,6 +285,45 @@ include APP_ROOT . '/includes/header.php';
         </div>
         <?php endif; ?>
 
+        <!-- Spedizioni Collegate -->
+        <?php if (isModuleEnabled('spedizioni')): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>Spedizioni (<?= count($spedizioniLinked) ?>)</h6>
+                <?php if (isTechnician()): ?>
+                <a href="<?= APP_URL ?>/modules/spedizioni/create.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg me-1"></i>Nuova Spedizione</a>
+                <?php endif; ?>
+            </div>
+            <?php if ($spedizioniLinked): ?>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>ID</th><th>Stato</th><th>Destinatario</th><th>Corriere</th><th>Tracking</th><th>Data</th><th></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($spedizioniLinked as $sp): ?>
+                    <tr>
+                        <td class="small text-muted font-monospace">SPD-<?= str_pad($sp['id'],4,'0',STR_PAD_LEFT) ?></td>
+                        <td><?= getSpedizioneStatusBadge($sp['status']) ?></td>
+                        <td class="small"><?= $sp['destinatario'] ? h($sp['destinatario']) : '-' ?></td>
+                        <td class="small"><?= $sp['corriere'] ? h($sp['corriere']) : '-' ?></td>
+                        <td class="small font-monospace"><?= $sp['numero_tracking'] ? h($sp['numero_tracking']) : '-' ?></td>
+                        <td class="small text-muted"><?= $sp['data_spedizione'] ? formatDate($sp['data_spedizione'], 'd/m/Y') : '-' ?></td>
+                        <td><a href="<?= APP_URL ?>/modules/spedizioni/view.php?id=<?= $sp['id'] ?>" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="card-body text-center text-muted small py-3">
+                <i class="bi bi-truck d-block mb-1 fs-4 opacity-50"></i>Nessuna spedizione collegata a questo ticket.
+                <?php if (isTechnician()): ?>
+                <div class="mt-2"><a href="<?= APP_URL ?>/modules/spedizioni/create.php?ticket_id=<?= $id ?>">Crea la prima spedizione</a></div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <!-- Periferiche Collegate -->
         <?php if (isModuleEnabled('periferiche')): ?>
         <div class="card border-0 shadow-sm">
@@ -367,6 +414,9 @@ include APP_ROOT . '/includes/header.php';
             <div class="card-header bg-white"><h6 class="mb-0">Azioni</h6></div>
             <div class="card-body d-grid gap-2">
                 <a href="<?= APP_URL ?>/modules/spare_parts/request.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-tools me-1"></i>Richiedi Parte</a>
+                <?php if (isModuleEnabled('spedizioni')): ?>
+                <a href="<?= APP_URL ?>/modules/spedizioni/create.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-truck me-1"></i>Nuova Spedizione</a>
+                <?php endif; ?>
                 <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica Ticket</a>
             </div>
         </div>

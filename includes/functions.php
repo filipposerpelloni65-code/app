@@ -145,3 +145,23 @@ function getPerifericaStatoLabel(string $stato): string {
     ];
     return $labels[$stato] ?? $stato;
 }
+
+function getSpedizioneStatusBadge(string $status): string {
+    $badges = [
+        'da_spedire' => '<span class="badge bg-warning text-dark">Da Spedire</span>',
+        'spedita'    => '<span class="badge bg-primary">Spedita</span>',
+        'consegnata' => '<span class="badge bg-success">Consegnata</span>',
+        'annullata'  => '<span class="badge bg-secondary">Annullata</span>',
+    ];
+    return $badges[$status] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($status) . '</span>';
+}
+
+function getSpedizioneStatusLabel(string $status): string {
+    $labels = [
+        'da_spedire' => 'Da Spedire',
+        'spedita'    => 'Spedita',
+        'consegnata' => 'Consegnata',
+        'annullata'  => 'Annullata',
+    ];
+    return $labels[$status] ?? $status;
+}
