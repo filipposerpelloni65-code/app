@@ -145,3 +145,21 @@ function getPerifericaStatoLabel(string $stato): string {
     ];
     return $labels[$stato] ?? $stato;
 }
+
+function getComponenteTipoBadge(string $tipo): string {
+    $badges = [
+        'periferica' => '<span class="badge bg-primary">Periferica</span>',
+        'accessorio' => '<span class="badge bg-info text-dark">Accessorio</span>',
+        'cavo'       => '<span class="badge bg-secondary">Cavo</span>',
+    ];
+    return $badges[$tipo] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($tipo) . '</span>';
+}
+
+function getComponenteTipoLabel(string $tipo): string {
+    $labels = [
+        'periferica' => 'Periferica',
+        'accessorio' => 'Accessorio',
+        'cavo'       => 'Cavo',
+    ];
+    return $labels[$tipo] ?? $tipo;
+}
