@@ -344,7 +344,11 @@ include APP_ROOT . '/includes/header.php';
                 <form method="post">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="archive">
-                    <button type="submit" class="btn btn-outline-secondary w-100" onclick="return confirm('Archiviare il rapportino? Questa azione non può essere annullata.')"><i class="bi bi-archive me-1"></i>Archivia</button>
+                    <button type="submit"
+                        class="btn btn-outline-secondary w-100"
+                        data-confirm="Archiviare il rapportino? Questa azione non può essere annullata."
+                        data-confirm-class="btn-warning"
+                        data-confirm-text="Archivia"><i class="bi bi-archive me-1"></i>Archivia</button>
                 </form>
             </div>
         </div>

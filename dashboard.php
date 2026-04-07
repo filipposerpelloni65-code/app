@@ -40,8 +40,16 @@ if (isTechnician() && $user['role'] !== 'user') {
     $myTickets = $stmt->fetchAll();
 }
 
+// Data for quick-create ticket modal
+$dashCategories  = $db->query("SELECT * FROM ticket_categories ORDER BY name")->fetchAll();
+$dashTechnicians = isTechnician()
+    ? $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll()
+    : [];
+
 include APP_ROOT . '/includes/header.php';
 ?>
+
+<script>window.appUrl = <?= json_encode(APP_URL) ?>;</script>
 
 <div class="row g-4 mb-4">
     <div class="col-sm-6 col-xl-3">
@@ -107,7 +115,9 @@ include APP_ROOT . '/includes/header.php';
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>Ticket Recenti</h5>
-                <a href="<?= APP_URL ?>/modules/tickets/create.php" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuovo</a>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#quickCreateTicketModal">
+                    <i class="bi bi-plus-lg me-1"></i>Nuovo
+                </button>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -188,6 +198,87 @@ include APP_ROOT . '/includes/header.php';
             </div>
         </div>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- ============================================================
+     Quick Create Ticket Modal
+     ============================================================ -->
+<div class="modal fade" id="quickCreateTicketModal" tabindex="-1" aria-labelledby="quickCreateTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-semibold" id="quickCreateTicketModalLabel">
+                    <i class="bi bi-plus-circle text-primary me-2"></i>Nuovo Ticket
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <form method="post" action="<?= APP_URL ?>/modules/tickets/create.php">
+                <?= csrfField() ?>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Titolo <span class="text-danger">*</span></label>
+                        <input type="text" name="title" class="form-control" required placeholder="Descrivi brevemente il problema...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Descrizione <span class="text-danger">*</span></label>
+                        <textarea name="description" class="form-control" rows="4" required placeholder="Descrizione dettagliata del problema..."></textarea>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Priorità</label>
+                            <select name="priority" class="form-select">
+                                <option value="low">Bassa</option>
+                                <option value="medium" selected>Media</option>
+                                <option value="high">Alta</option>
+                                <option value="urgent">Urgente</option>
+                            </select>
+                        </div>
+                        <?php if ($dashCategories): ?>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Categoria</label>
+                            <select name="category_id" class="form-select">
+                                <option value="">-- Nessuna --</option>
+                                <?php foreach ($dashCategories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>"><?= h($cat['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($dashTechnicians): ?>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Assegna a</label>
+                            <select name="assigned_to" class="form-select">
+                                <option value="">-- Non assegnato --</option>
+                                <?php foreach ($dashTechnicians as $tech): ?>
+                                <option value="<?= $tech['id'] ?>"><?= h($tech['full_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label fw-semibold">Codice Ticket Concessionario</label>
+                        <input type="text" name="codice_concessionario" class="form-control font-monospace" placeholder="Es. TKT-DEALER-001 (opzionale)">
+                    </div>
+                    <p class="text-muted small mt-3 mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Per associare un concessionario o punto vendita, usa il <a href="<?= APP_URL ?>/modules/tickets/create.php" class="text-decoration-none">form completo</a>.
+                    </p>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Annulla
+                    </button>
+                    <a href="<?= APP_URL ?>/modules/tickets/create.php" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-right me-1"></i>Form Completo
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Crea Ticket
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 

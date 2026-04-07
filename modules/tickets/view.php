@@ -211,11 +211,16 @@ include APP_ROOT . '/includes/header.php';
                         <td class="small"><?= h($u['tecnico_name']) ?></td>
                         <td class="small text-muted"><?= $u['note'] ? h($u['note']) : '-' ?></td>
                         <td>
-                            <form method="post" onsubmit="return confirm('Eliminare questa uscita?')">
+                            <form method="post">
                                 <?= csrfField() ?>
                                 <input type="hidden" name="action" value="delete_uscita">
                                 <input type="hidden" name="uscita_id" value="<?= $u['id'] ?>">
-                                <button type="submit" class="btn btn-outline-danger btn-sm py-0" title="Elimina"><i class="bi bi-trash"></i></button>
+                                <button type="submit"
+                                    class="btn btn-outline-danger btn-sm py-0"
+                                    data-confirm="Eliminare questa uscita?"
+                                    data-confirm-class="btn-danger"
+                                    data-confirm-text="Elimina"
+                                    title="Elimina"><i class="bi bi-trash"></i></button>
                             </form>
                         </td>
                     </tr>
@@ -349,7 +354,7 @@ include APP_ROOT . '/includes/header.php';
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-header bg-white"><h6 class="mb-0">Cambia Stato</h6></div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" id="statusUpdateForm">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="change_status">
                     <select name="new_status" class="form-select form-select-sm mb-2">
@@ -366,7 +371,18 @@ include APP_ROOT . '/includes/header.php';
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white"><h6 class="mb-0">Azioni</h6></div>
             <div class="card-body d-grid gap-2">
+                <?php
+                $modalParts   = $db->query("SELECT * FROM spare_parts WHERE quantity > 0 ORDER BY name")->fetchAll();
+                $modalTickets = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT 100")->fetchAll();
+                ?>
+                <?php if ($modalParts && isModuleEnabled('spare_parts')): ?>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-bs-toggle="modal" data-bs-target="#partRequestModalView">
+                    <i class="bi bi-tools me-1"></i>Richiedi Parte
+                </button>
+                <?php else: ?>
                 <a href="<?= APP_URL ?>/modules/spare_parts/request.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-tools me-1"></i>Richiedi Parte</a>
+                <?php endif; ?>
                 <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica Ticket</a>
             </div>
         </div>
@@ -375,5 +391,56 @@ include APP_ROOT . '/includes/header.php';
 </div>
 
 <style>.user-avatar-sm{width:28px;height:28px;font-size:.75rem;line-height:28px;border-radius:50%;background:var(--bs-primary);color:#fff;text-align:center;display:inline-block;}</style>
+
+<?php if (isTechnician() && isModuleEnabled('spare_parts') && !empty($modalParts)): ?>
+<!-- Parts Request Modal (from ticket view) -->
+<div class="modal fade" id="partRequestModalView" tabindex="-1" aria-labelledby="partRequestModalViewLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-semibold" id="partRequestModalViewLabel">
+                    <i class="bi bi-tools text-success me-2"></i>Richiedi Parte di Ricambio
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <form method="post" action="<?= APP_URL ?>/modules/spare_parts/request.php">
+                <?= csrfField() ?>
+                <input type="hidden" name="ticket_id" value="<?= $id ?>">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Parte di Ricambio <span class="text-danger">*</span></label>
+                        <select name="part_id" class="form-select" required>
+                            <option value="">-- Seleziona parte --</option>
+                            <?php foreach ($modalParts as $mp): ?>
+                            <option value="<?= $mp['id'] ?>">
+                                <?= h($mp['name']) ?> (<?= h($mp['sku']) ?>) — <?= (int)$mp['quantity'] ?> disponibili
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Quantità</label>
+                        <input type="number" name="quantity" class="form-control" value="1" min="1">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold">Note</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Note aggiuntive..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Annulla
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-send me-1"></i>Invia Richiesta
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<script>window.appUrl = <?= json_encode(APP_URL) ?>;</script>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
