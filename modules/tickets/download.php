@@ -41,7 +41,7 @@ $mime = $att['mimetype'] ?: mime_content_type($filePath) ?: 'application/octet-s
 $filename = basename($att['filename']);
 
 header('Content-Type: ' . $mime);
-header('Content-Disposition: inline; filename="' . addslashes($filename) . '"');
+header('Content-Disposition: inline; filename="' . str_replace('"', '\\"', $filename) . '"');
 header('Content-Length: ' . filesize($filePath));
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: private, max-age=3600');

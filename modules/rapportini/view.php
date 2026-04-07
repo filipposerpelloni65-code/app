@@ -67,9 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'archi
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido. Riprova.'; }
     if (!$errors && $r['status'] === 'signed') {
         $db->prepare("UPDATE rapportini SET status='archived', updated_at=NOW() WHERE id=?")->execute([$id]);
-        // Auto-update linked periferica to 'riparata' if still in repairable state
+        // Auto-update linked periferica to 'riparata' if it was being diagnosed or repaired
         if ($r['periferica_id']) {
-            $db->prepare("UPDATE periferiche_guaste SET stato='riparata', updated_at=NOW() WHERE id=? AND stato IN ('in_riparazione','in_diagnosi','in_giacenza')")
+            $db->prepare("UPDATE periferiche_guaste SET stato='riparata', updated_at=NOW() WHERE id=? AND stato IN ('in_riparazione','in_diagnosi')")
                ->execute([$r['periferica_id']]);
         }
         logActivity($user['id'], 'archive', 'rapportino', $id, 'Rapportino archiviato');

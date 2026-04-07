@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'uploa
             $uploadDir = APP_ROOT . '/uploads/tickets/' . $id . '/';
             if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            $safeName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', pathinfo($file['name'], PATHINFO_FILENAME));
+            $safeName = preg_replace('/[^a-zA-Z0-9_]/', '_', pathinfo($file['name'], PATHINFO_FILENAME));
             $filename = $safeName . '_' . time() . '.' . $ext;
             $destPath = $uploadDir . $filename;
             if (move_uploaded_file($file['tmp_name'], $destPath)) {

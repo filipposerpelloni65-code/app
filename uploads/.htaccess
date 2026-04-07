@@ -1,5 +1,12 @@
 # Allow only safe file types to be served
 <FilesMatch "\.(php|php3|php4|php5|phtml|cgi|pl|py|rb|sh)$">
-    Order Allow,Deny
-    Deny from all
+    # Apache 2.4+
+    <IfVersion >= 2.4>
+        Require all denied
+    </IfVersion>
+    # Apache 2.2
+    <IfVersion < 2.4>
+        Order Allow,Deny
+        Deny from all
+    </IfVersion>
 </FilesMatch>

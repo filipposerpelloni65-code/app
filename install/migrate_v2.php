@@ -20,7 +20,7 @@ $migrations = [
     "ALTER TABLE rapportini ADD COLUMN ora_inizio TIME NULL AFTER tipo_intervento",
     "ALTER TABLE rapportini ADD COLUMN ora_fine TIME NULL AFTER ora_inizio",
     "ALTER TABLE rapportini ADD COLUMN ore_lavorate DECIMAL(5,2) NULL AFTER ora_fine",
-    // Ticket attachments (ensure filepath_disk column exists for absolute path)
+    // Ticket attachments columns (filesize, mimetype for richer metadata)
     "ALTER TABLE ticket_attachments ADD COLUMN filesize INT UNSIGNED NULL",
     "ALTER TABLE ticket_attachments ADD COLUMN mimetype VARCHAR(100) NULL",
 ];
