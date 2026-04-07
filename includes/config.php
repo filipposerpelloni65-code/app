@@ -1,6 +1,10 @@
 <?php
 define('APP_ROOT', dirname(__DIR__));
-define('APP_URL', (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/'));
+$_appDocRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/');
+$_appRootPath = dirname(__DIR__);
+$_appUrlPath = $_appDocRoot !== '' ? str_replace($_appDocRoot, '', $_appRootPath) : '';
+define('APP_URL', (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . $_appUrlPath);
+unset($_appDocRoot, $_appRootPath, $_appUrlPath);
 
 $configFile = APP_ROOT . '/config.ini';
 if (!file_exists($configFile)) {
