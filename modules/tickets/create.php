@@ -29,13 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $assigned_to = (int)($_POST['assigned_to'] ?? 0) ?: null;
     $dealer_id = (int)($_POST['dealer_id'] ?? 0) ?: null;
     $location_id = (int)($_POST['location_id'] ?? 0) ?: null;
+    $codice_concessionario = trim($_POST['codice_concessionario'] ?? '') ?: null;
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!$description) $errors[] = 'La descrizione è obbligatoria.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
 
     if (!$errors) {
-        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, status) VALUES (?,?,?,?,?,?,?,?,'open')");
-        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id]);
+        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, status) VALUES (?,?,?,?,?,?,?,?,?,'open')");
+        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario]);
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'create', 'ticket', $newId, "Creato ticket: $title");
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $newId . '&created=1');
@@ -78,6 +79,11 @@ include APP_ROOT . '/includes/header.php';
     <div class="mb-3">
         <label class="form-label fw-semibold">Titolo <span class="text-danger">*</span></label>
         <input type="text" name="title" class="form-control" required value="<?= h($_POST['title'] ?? '') ?>">
+    </div>
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Codice Ticket Concessionario</label>
+        <input type="text" name="codice_concessionario" class="form-control font-monospace" value="<?= h($_POST['codice_concessionario'] ?? '') ?>" placeholder="Es. TKT-DEALER-001">
+        <div class="form-text">Riferimento del ticket comunicato dal concessionario via email (opzionale).</div>
     </div>
     <div class="mb-3">
         <label class="form-label fw-semibold">Descrizione <span class="text-danger">*</span></label>
