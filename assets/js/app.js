@@ -528,3 +528,202 @@ window.appUrl = window.appUrl || '';
     setInterval(poll, pollInterval);
 
 }());
+
+/* ============================================================
+   Staggered entrance animations using IntersectionObserver
+   ============================================================ */
+(function () {
+    'use strict';
+
+    // Animate table rows on page load with stagger
+    function animateTableRows() {
+        var rows = document.querySelectorAll('tbody tr');
+        rows.forEach(function (row, i) {
+            row.style.opacity = '0';
+            row.style.transform = 'translateY(10px)';
+            row.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            setTimeout(function () {
+                row.style.opacity = '1';
+                row.style.transform = 'translateY(0)';
+            }, 40 + i * 30);
+        });
+    }
+
+    // Animate cards on page load with stagger
+    function animateCards() {
+        var cards = document.querySelectorAll('.card:not(.no-anim)');
+        cards.forEach(function (card, i) {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(14px)';
+            card.style.transition = 'opacity 0.35s ease, transform 0.35s ease, box-shadow 0.25s ease';
+            setTimeout(function () {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 60 + i * 50);
+        });
+    }
+
+    // Animate stat cards with counter effect
+    function animateStatValues() {
+        var statValues = document.querySelectorAll('.stat-value[data-target]');
+        statValues.forEach(function (el) {
+            var target = parseInt(el.dataset.target, 10) || 0;
+            var duration = 800;
+            var start = 0;
+            var startTime = null;
+            function step(timestamp) {
+                if (!startTime) startTime = timestamp;
+                var progress = Math.min((timestamp - startTime) / duration, 1);
+                var eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+                el.textContent = Math.round(eased * target);
+                if (progress < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(animateTableRows, 100);
+        setTimeout(animateCards, 50);
+        setTimeout(animateStatValues, 200);
+    });
+}());
+
+/* ============================================================
+   Ticket Quick View Modal
+   ============================================================ */
+(function () {
+    'use strict';
+
+    var appUrl = (document.querySelector('meta[name="app-url"]') || {}).content || window.appUrl || '';
+
+    // Status label map
+    var STATUS_LABELS_QV = {
+        'open':        { label: 'Aperto',        cls: 'badge-status-open' },
+        'in_progress': { label: 'In Lavorazione', cls: 'badge-status-in_progress' },
+        'waiting':     { label: 'In Attesa',      cls: 'badge-status-waiting' },
+        'resolved':    { label: 'Risolto',        cls: 'badge-status-resolved' },
+        'closed':      { label: 'Chiuso',         cls: 'badge-status-closed' }
+    };
+
+    var PRIORITY_LABELS_QV = {
+        'low':    { label: 'Bassa',    cls: 'badge-priority-low',    icon: 'bi-arrow-down-circle' },
+        'medium': { label: 'Media',    cls: 'badge-priority-medium', icon: 'bi-dash-circle' },
+        'high':   { label: 'Alta',     cls: 'badge-priority-high',   icon: 'bi-exclamation-circle' },
+        'urgent': { label: 'Urgente',  cls: 'badge-priority-urgent', icon: 'bi-exclamation-triangle-fill' }
+    };
+
+    function esc(str) {
+        return $('<span>').text(str || '').html();
+    }
+
+    function statusBadge(s) {
+        var m = STATUS_LABELS_QV[s] || { label: s, cls: 'bg-secondary' };
+        return '<span class="badge ' + m.cls + '">' + m.label + '</span>';
+    }
+
+    function priorityBadge(p) {
+        var m = PRIORITY_LABELS_QV[p] || { label: p, cls: 'bg-secondary', icon: 'bi-circle' };
+        return '<span class="badge ' + m.cls + '"><i class="bi ' + m.icon + ' me-1"></i>' + m.label + '</span>';
+    }
+
+    $(document).on('click', '.ticket-quick-view', function (e) {
+        e.preventDefault();
+        var $btn = $(this);
+        var id = $btn.data('ticket-id');
+        if (!id) return;
+
+        var $modal = $('#ticketQuickViewModal');
+        if (!$modal.length) return;
+
+        // Show loading state
+        $modal.find('#qvBody').html(
+            '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted small">Caricamento...</div></div>'
+        );
+        $modal.find('#qvTitle').text('Caricamento...');
+        $modal.find('#qvCode').text('');
+        $modal.find('#qvHeaderActions').empty();
+
+        var bsModal = bootstrap.Modal.getOrCreateInstance($modal[0]);
+        bsModal.show();
+
+        // Fetch ticket data via API
+        $.get(appUrl + '/api/tickets.php', { action: 'get', id: id }, function (data) {
+            if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e) { data = {}; } }
+            if (!data.success || !data.ticket) {
+                $modal.find('#qvBody').html('<div class="alert alert-danger m-3">Impossibile caricare il ticket.</div>');
+                return;
+            }
+            var t = data.ticket;
+            var prefix = (window.ticketPrefix || 'TKT') + '-' + String(t.id).padStart(4, '0');
+
+            // Update header
+            $modal.find('#qvTitle').text(t.title || 'Ticket #' + t.id);
+            $modal.find('#qvCode').text(prefix);
+
+            // Header action buttons
+            var actions = '<a href="' + appUrl + '/modules/tickets/view.php?id=' + t.id + '" class="btn btn-sm btn-light me-1"><i class="bi bi-eye me-1"></i>Apri</a>';
+            if (data.can_edit) {
+                actions += '<a href="' + appUrl + '/modules/tickets/edit.php?id=' + t.id + '" class="btn btn-sm btn-warning"><i class="bi bi-pencil me-1"></i>Modifica</a>';
+            }
+            $modal.find('#qvHeaderActions').html(actions);
+
+            // Build body
+            var descHtml = '<div class="qv-description">' + esc(t.description || '').replace(/\n/g, '<br>') + '</div>';
+
+            var metaHtml = '<div class="row g-3 mb-3">' +
+                '<div class="col-6 col-md-3"><div class="qv-meta-item"><span class="qv-meta-label">Stato</span><span class="qv-meta-value">' + statusBadge(t.status) + '</span></div></div>' +
+                '<div class="col-6 col-md-3"><div class="qv-meta-item"><span class="qv-meta-label">Priorità</span><span class="qv-meta-value">' + priorityBadge(t.priority) + '</span></div></div>' +
+                '<div class="col-6 col-md-3"><div class="qv-meta-item"><span class="qv-meta-label">Categoria</span><span class="qv-meta-value">' + esc(t.category_name || '—') + '</span></div></div>' +
+                '<div class="col-6 col-md-3"><div class="qv-meta-item"><span class="qv-meta-label">Assegnato a</span><span class="qv-meta-value">' + esc(t.assignee_name || 'Non assegnato') + '</span></div></div>' +
+                '<div class="col-6 col-md-3"><div class="qv-meta-item"><span class="qv-meta-label">Creato da</span><span class="qv-meta-value">' + esc(t.creator_name || '—') + '</span></div></div>' +
+                '<div class="col-6 col-md-3"><div class="qv-meta-item"><span class="qv-meta-label">Concessionario</span><span class="qv-meta-value">' + esc(t.dealer_name || '—') + '</span></div></div>' +
+                '<div class="col-6 col-md-3"><div class="qv-meta-item"><span class="qv-meta-label">Creato il</span><span class="qv-meta-value">' + esc(t.created_at ? t.created_at.substring(0,10).split('-').reverse().join('/') : '—') + '</span></div></div>' +
+                '<div class="col-6 col-md-3"><div class="qv-meta-item"><span class="qv-meta-label">Aggiornato</span><span class="qv-meta-value">' + esc(t.updated_at ? t.updated_at.substring(0,10).split('-').reverse().join('/') : '—') + '</span></div></div>' +
+                '</div>';
+
+            // Quick status change form (if can_edit)
+            var statusFormHtml = '';
+            if (data.can_edit && t.status !== 'closed') {
+                var opts = '';
+                $.each(STATUS_LABELS_QV, function(k, v) {
+                    opts += '<option value="' + k + '"' + (k === t.status ? ' selected' : '') + '>' + v.label + '</option>';
+                });
+                statusFormHtml = '<div class="border-top pt-3 mt-1">' +
+                    '<div class="qv-meta-label mb-2">Cambio rapido stato</div>' +
+                    '<form id="qvStatusForm" method="post" action="' + appUrl + '/modules/tickets/view.php?id=' + t.id + '" class="d-flex gap-2 align-items-center flex-wrap">' +
+                    '<input type="hidden" name="action" value="change_status">' +
+                    '<input type="hidden" name="csrf_token" id="qvCsrfToken" value="">' +
+                    '<select name="new_status" class="form-select form-select-sm" style="max-width:200px">' + opts + '</select>' +
+                    '<button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Aggiorna Stato</button>' +
+                    '</form></div>';
+            }
+
+            $modal.find('#qvBody').html(metaHtml +
+                '<div class="qv-meta-label mb-2">Descrizione</div>' +
+                descHtml + statusFormHtml
+            );
+
+            // Fill CSRF token
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            if (csrfMeta) {
+                $modal.find('#qvCsrfToken').val(csrfMeta.content);
+            }
+
+            // Handle status form submit
+            $modal.find('#qvStatusForm').off('submit').on('submit', function(e) {
+                e.preventDefault();
+                var $form = $(this);
+                var newStatus = $form.find('[name="new_status"]').val();
+                var label = (STATUS_LABELS_QV[newStatus] || {}).label || newStatus;
+                showConfirmModal('Confermi il cambio di stato a: ' + label + '?', function() {
+                    $form.off('submit').submit();
+                }, { btnClass: 'btn-primary', btnText: 'Conferma', title: 'Cambia Stato' });
+            });
+
+        }).fail(function() {
+            $modal.find('#qvBody').html('<div class="alert alert-danger m-3">Errore di comunicazione con il server.</div>');
+        });
+    });
+
+}());

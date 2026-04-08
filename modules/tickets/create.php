@@ -70,80 +70,159 @@ if ($selectedDealer) {
 include APP_ROOT . '/includes/header.php';
 ?>
 
-<div class="row justify-content-center">
-<div class="col-lg-8">
+<style>
+.create-ticket-header {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+.create-ticket-header::before {
+    content: '';
+    position: absolute;
+    top: -50px; right: -50px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(59,130,246,.12);
+}
+</style>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0"><i class="bi bi-plus-circle me-2 text-primary"></i>Nuovo Ticket</h4>
-    <a href="<?= APP_URL ?>/modules/tickets/index.php" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Torna alla lista</a>
+<div class="create-ticket-header animate-fade-in">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <div class="d-flex align-items-center gap-3 mb-1">
+                <div style="width:48px;height:48px;border-radius:12px;background:rgba(59,130,246,.25);display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-plus-circle-fill text-primary fs-4"></i>
+                </div>
+                <div>
+                    <h4 class="mb-0 fw-bold text-white">Nuovo Ticket</h4>
+                    <div class="text-white opacity-75 small">Inserisci i dettagli del nuovo ticket di assistenza</div>
+                </div>
+            </div>
+        </div>
+        <a href="<?= APP_URL ?>/modules/tickets/index.php" class="btn btn-outline-light btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Torna alla lista
+        </a>
+    </div>
 </div>
 
 <?php if ($errors): ?>
-<div class="alert alert-danger">
-    <ul class="mb-0"><?php foreach ($errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?></ul>
+<div class="alert alert-danger animate-slide-down">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <ul class="mb-0 mt-1"><?php foreach ($errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?></ul>
 </div>
 <?php endif; ?>
 
-<div class="card border-0 shadow-sm">
-<div class="card-body">
-<form method="post">
-    <?= csrfField() ?>
-    <div class="mb-3">
-        <label class="form-label fw-semibold">Titolo <span class="text-danger">*</span></label>
-        <input type="text" name="title" class="form-control" required value="<?= h($_POST['title'] ?? '') ?>">
+<form method="post" id="createTicketForm">
+<?= csrfField() ?>
+
+<!-- Sezione 1: Informazioni principali -->
+<div class="form-section animate-fade-in" style="animation-delay:.05s">
+    <div class="form-section-title">
+        <i class="bi bi-card-text"></i> Informazioni Principali
     </div>
     <div class="mb-3">
-        <label class="form-label fw-semibold">Codice Ticket Concessionario</label>
-        <input type="text" name="codice_concessionario" class="form-control font-monospace" value="<?= h($_POST['codice_concessionario'] ?? '') ?>" placeholder="Es. TKT-DEALER-001">
+        <label class="form-label">Titolo <span class="text-danger">*</span></label>
+        <input type="text" name="title" class="form-control form-control-lg"
+               required value="<?= h($_POST['title'] ?? '') ?>"
+               placeholder="Descrivi brevemente il problema...">
+    </div>
+    <div class="mb-0">
+        <label class="form-label">Codice Ticket Concessionario</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-hash"></i></span>
+            <input type="text" name="codice_concessionario" class="form-control font-monospace"
+                   value="<?= h($_POST['codice_concessionario'] ?? '') ?>"
+                   placeholder="Es. TKT-DEALER-001">
+        </div>
         <div class="form-text">Riferimento del ticket comunicato dal concessionario via email (opzionale).</div>
     </div>
-    <div class="mb-3">
-        <label class="form-label fw-semibold">Descrizione <span class="text-danger">*</span></label>
-        <textarea name="description" class="form-control" rows="6" required><?= h($_POST['description'] ?? '') ?></textarea>
+</div>
+
+<!-- Sezione 2: Descrizione -->
+<div class="form-section animate-fade-in" style="animation-delay:.1s">
+    <div class="form-section-title">
+        <i class="bi bi-chat-text"></i> Descrizione del Problema
     </div>
-    <div class="row g-3 mb-3">
-        <div class="col-md-4">
-            <label class="form-label fw-semibold">Priorità</label>
-            <select name="priority" class="form-select">
-                <option value="low" <?= ($_POST['priority'] ?? 'medium') === 'low' ? 'selected' : '' ?>>Bassa</option>
-                <option value="medium" <?= ($_POST['priority'] ?? 'medium') === 'medium' ? 'selected' : '' ?>>Media</option>
-                <option value="high" <?= ($_POST['priority'] ?? 'medium') === 'high' ? 'selected' : '' ?>>Alta</option>
-                <option value="urgent" <?= ($_POST['priority'] ?? 'medium') === 'urgent' ? 'selected' : '' ?>>Urgente</option>
-            </select>
-        </div>
-        <div class="col-md-4">
-            <label class="form-label fw-semibold">Categoria</label>
+    <textarea name="description" class="form-control" rows="7" required
+              placeholder="Descrivi dettagliatamente il problema, i passaggi per riprodurlo e qualsiasi informazione rilevante..."><?= h($_POST['description'] ?? '') ?></textarea>
+</div>
+
+<!-- Sezione 3: Priorità -->
+<div class="form-section animate-fade-in" style="animation-delay:.15s">
+    <div class="form-section-title">
+        <i class="bi bi-speedometer2"></i> Priorità
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <?php
+        $priorities = [
+            'low'    => ['label' => 'Bassa',   'icon' => 'bi-arrow-down-circle',         'desc' => 'Nessuna urgenza'],
+            'medium' => ['label' => 'Media',   'icon' => 'bi-dash-circle',               'desc' => 'Normale'],
+            'high'   => ['label' => 'Alta',    'icon' => 'bi-exclamation-circle',         'desc' => 'Richiede attenzione'],
+            'urgent' => ['label' => 'Urgente', 'icon' => 'bi-exclamation-triangle-fill', 'desc' => 'Blocca l\'attività'],
+        ];
+        $currentPriority = $_POST['priority'] ?? 'medium';
+        foreach ($priorities as $val => $p): ?>
+        <input type="radio" name="priority" value="<?= $val ?>" id="prio_<?= $val ?>"
+               class="priority-option" <?= $currentPriority === $val ? 'checked' : '' ?>>
+        <label for="prio_<?= $val ?>">
+            <i class="bi <?= $p['icon'] ?>"></i>
+            <strong><?= $p['label'] ?></strong>
+            <span style="font-size:.7rem;opacity:.75;font-weight:400"><?= $p['desc'] ?></span>
+        </label>
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<!-- Sezione 4: Classificazione -->
+<div class="form-section animate-fade-in" style="animation-delay:.2s">
+    <div class="form-section-title">
+        <i class="bi bi-tags"></i> Classificazione
+    </div>
+    <div class="row g-3">
+        <div class="col-md-<?= isTechnician() ? '6' : '12' ?>">
+            <label class="form-label">Categoria</label>
             <select name="category_id" class="form-select">
-                <option value="">-- Nessuna categoria --</option>
+                <option value="">— Nessuna categoria —</option>
                 <?php foreach ($categories as $cat): ?>
                 <option value="<?= $cat['id'] ?>" <?= ($_POST['category_id'] ?? '') == $cat['id'] ? 'selected' : '' ?>><?= h($cat['name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
         <?php if (isTechnician()): ?>
-        <div class="col-md-4">
-            <label class="form-label fw-semibold">Assegna a</label>
+        <div class="col-md-6">
+            <label class="form-label">Assegna a</label>
             <div class="input-group">
                 <select name="assigned_to" class="form-select" id="assignedToSelect">
-                    <option value="">-- Non assegnato --</option>
+                    <option value="">— Non assegnato —</option>
                     <?php foreach ($technicians as $tech): ?>
                     <option value="<?= $tech['id'] ?>" <?= ($_POST['assigned_to'] ?? '') == $tech['id'] ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
                     <?php endforeach; ?>
                 </select>
-                <button type="button" class="btn btn-outline-secondary" id="autoAssignBtn" title="Auto-assegna al tecnico meno carico">
+                <button type="button" class="btn btn-outline-secondary" id="autoAssignBtn" title="Auto-assegna al tecnico meno carico" data-bs-toggle="tooltip">
                     <i class="bi bi-magic"></i>
                 </button>
             </div>
-            <div class="form-text">Clicca <i class="bi bi-magic"></i> per assegnare automaticamente al tecnico meno carico.</div>
+            <div class="form-text">Clicca <i class="bi bi-magic"></i> per auto-assegnare al tecnico meno carico.</div>
         </div>
         <?php endif; ?>
     </div>
-    <?php if ($dealers): ?>
-    <div class="row g-3 mb-3">
+</div>
+
+<?php if ($dealers): ?>
+<!-- Sezione 5: Concessionario -->
+<div class="form-section animate-fade-in" style="animation-delay:.25s">
+    <div class="form-section-title">
+        <i class="bi bi-building"></i> Concessionario
+    </div>
+    <div class="row g-3">
         <div class="col-md-6">
-            <label class="form-label fw-semibold">Concessionario</label>
+            <label class="form-label">Concessionario</label>
             <select name="dealer_id" class="form-select" id="dealerSelect" onchange="this.form.submit()">
-                <option value="">-- Nessun concessionario --</option>
+                <option value="">— Nessun concessionario —</option>
                 <?php foreach ($dealers as $d): ?>
                 <option value="<?= $d['id'] ?>" <?= ($selectedDealer == $d['id']) ? 'selected' : '' ?>><?= h($d['name']) ?></option>
                 <?php endforeach; ?>
@@ -151,9 +230,9 @@ include APP_ROOT . '/includes/header.php';
         </div>
         <?php if ($dealerLocations): ?>
         <div class="col-md-6">
-            <label class="form-label fw-semibold">Punto Vendita</label>
+            <label class="form-label">Punto Vendita</label>
             <select name="location_id" class="form-select">
-                <option value="">-- Nessun punto vendita --</option>
+                <option value="">— Nessun punto vendita —</option>
                 <?php foreach ($dealerLocations as $dl): ?>
                 <option value="<?= $dl['id'] ?>" <?= ($_POST['location_id'] ?? '') == $dl['id'] ? 'selected' : '' ?>><?= h($dl['name']) ?></option>
                 <?php endforeach; ?>
@@ -161,17 +240,20 @@ include APP_ROOT . '/includes/header.php';
         </div>
         <?php endif; ?>
     </div>
-    <?php endif; ?>
-    <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Crea Ticket</button>
-        <a href="<?= APP_URL ?>/modules/tickets/index.php" class="btn btn-light">Annulla</a>
-    </div>
-</form>
 </div>
+<?php endif; ?>
+
+<!-- Azioni -->
+<div class="d-flex gap-3 animate-fade-in" style="animation-delay:.3s">
+    <button type="submit" class="btn btn-primary btn-lg px-4" id="submitBtn">
+        <i class="bi bi-check-lg me-2"></i>Crea Ticket
+    </button>
+    <a href="<?= APP_URL ?>/modules/tickets/index.php" class="btn btn-outline-secondary btn-lg">
+        <i class="bi bi-x-lg me-1"></i>Annulla
+    </a>
 </div>
 
-</div>
-</div>
+</form>
 
 <?php
 $autoAssigneeId = isTechnician() ? getAutoAssignee() : null;

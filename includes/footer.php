@@ -34,6 +34,35 @@
     </div>
 </div>
 
+<!-- Ticket Quick View Modal -->
+<div class="modal fade" id="ticketQuickViewModal" tabindex="-1" aria-labelledby="ticketQuickViewLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                    <div>
+                        <div class="fw-bold text-white fs-6 text-truncate" id="qvTitle" style="max-width:380px">Caricamento...</div>
+                        <code class="text-white opacity-75 small" id="qvCode"></code>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2 ms-3" id="qvHeaderActions"></div>
+                <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body" id="qvBody">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <div class="mt-2 text-muted small">Caricamento...</div>
+                </div>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Chiudi
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

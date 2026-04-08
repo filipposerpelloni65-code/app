@@ -112,6 +112,10 @@ if (!empty($_GET['dealer_id'])) {
 include APP_ROOT . '/includes/header.php';
 ?>
 
+<script>
+window.appUrl = <?= json_encode(APP_URL) ?>;
+window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
+</script>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-ticket-detailed me-2 text-primary"></i>Gestione Ticket</h4>
     <div class="d-flex gap-2">
@@ -215,8 +219,13 @@ include APP_ROOT . '/includes/header.php';
                 <?php if ($tickets): ?>
                     <?php foreach ($tickets as $t): ?>
                     <tr>
-                        <td><a href="<?= APP_URL ?>/modules/tickets/view.php?id=<?= $t['id'] ?>" class="fw-bold text-primary text-decoration-none"><?= h(getTicketPrefix() . '-' . str_pad($t['id'], 4, '0', STR_PAD_LEFT)) ?></a></td>
-                        <td><a href="<?= APP_URL ?>/modules/tickets/view.php?id=<?= $t['id'] ?>" class="text-dark text-decoration-none"><?= h($t['title']) ?></a></td>
+                        <td><a href="<?= APP_URL ?>/modules/tickets/view.php?id=<?= $t['id'] ?>" class="fw-bold text-primary text-decoration-none font-monospace"><?= h(getTicketPrefix() . '-' . str_pad($t['id'], 4, '0', STR_PAD_LEFT)) ?></a></td>
+                        <td>
+                            <button type="button" class="btn btn-link p-0 text-dark text-decoration-none text-start ticket-quick-view fw-600"
+                                    data-ticket-id="<?= $t['id'] ?>" style="font-weight:600">
+                                <?= h($t['title']) ?>
+                            </button>
+                        </td>
                         <td class="small"><?= $t['category_name'] ? h($t['category_name']) : '-' ?></td>
                         <td><?= getStatusBadge($t['status']) ?></td>
                         <td><?= getPriorityBadge($t['priority']) ?></td>

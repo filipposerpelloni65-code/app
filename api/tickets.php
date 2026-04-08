@@ -21,14 +21,14 @@ switch ($action) {
 
     case 'get':
         $id = (int)($_GET['id'] ?? 0);
-        $stmt = $db->prepare("SELECT t.*, u.full_name as assignee_name FROM tickets t LEFT JOIN users u ON t.assigned_to=u.id WHERE t.id=?");
+        $stmt = $db->prepare("SELECT t.*, uc.full_name as creator_name, ua.full_name as assignee_name, c.name as category_name, d.name as dealer_name, dl.name as location_name FROM tickets t LEFT JOIN users uc ON t.created_by=uc.id LEFT JOIN users ua ON t.assigned_to=ua.id LEFT JOIN ticket_categories c ON t.category_id=c.id LEFT JOIN dealers d ON t.dealer_id=d.id LEFT JOIN dealer_locations dl ON t.location_id=dl.id WHERE t.id=?");
         $stmt->execute([$id]);
         $ticket = $stmt->fetch();
         if (!$ticket || ($user['role'] === 'user' && $ticket['created_by'] != $user['id'])) {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Not found']);
         } else {
-            echo json_encode(['success' => true, 'data' => $ticket]);
+            echo json_encode(['success' => true, 'ticket' => $ticket, 'can_edit' => isTechnician()]);
         }
         break;
 
