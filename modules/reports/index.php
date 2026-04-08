@@ -28,11 +28,45 @@ $reqStats = $db->query("SELECT status, COUNT(*) as cnt FROM spare_parts_requests
 // Average resolution time (resolved/closed tickets)
 $avgTime = $db->query("SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, closed_at)) FROM tickets WHERE closed_at IS NOT NULL")->fetchColumn();
 
+// Periferiche stats
+$periStats = [];
+try {
+    $periStats = $db->query("SELECT stato, COUNT(*) as cnt FROM periferiche_guaste GROUP BY stato")->fetchAll(PDO::FETCH_KEY_PAIR);
+} catch (Exception $e) { /* silent */ }
+
+// Spedizioni stats
+$spedStats = [];
+try {
+    $spedStats = $db->query("SELECT status, COUNT(*) as cnt FROM spedizioni GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+} catch (Exception $e) { /* silent */ }
+
+// Handle CSV export for tickets
+if (isset($_GET['export']) && $_GET['export'] === 'tickets_csv') {
+    $rows = $db->query("SELECT t.id, t.title, t.status, t.priority, uc.full_name as creator, ua.full_name as assignee, c.name as category, d.name as dealer, t.created_at, t.closed_at FROM tickets t LEFT JOIN users ua ON t.assigned_to=ua.id LEFT JOIN users uc ON t.created_by=uc.id LEFT JOIN ticket_categories c ON t.category_id=c.id LEFT JOIN dealers d ON t.dealer_id=d.id ORDER BY t.created_at DESC")->fetchAll();
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="report_tickets_' . date('Ymd') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
+    fputcsv($out, ['ID','Prefisso','Titolo','Stato','Priorità','Categoria','Creato da','Assegnato a','Concessionario','Creato il','Chiuso il'], ';');
+    foreach ($rows as $r) {
+        fputcsv($out, [
+            $r['id'],
+            getTicketPrefix().'-'.str_pad($r['id'],4,'0',STR_PAD_LEFT),
+            $r['title'], getStatusLabel($r['status']), getPriorityLabel($r['priority']),
+            $r['category']??'', $r['creator']??'', $r['assignee']??'', $r['dealer']??'',
+            $r['created_at'], $r['closed_at']??'',
+        ], ';');
+    }
+    fclose($out);
+    exit;
+}
+
 include APP_ROOT . '/includes/header.php';
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-bar-chart me-2 text-primary"></i>Report e Statistiche</h4>
+    <a href="?export=tickets_csv" class="btn btn-outline-success btn-sm"><i class="bi bi-download me-1"></i>Esporta Ticket CSV</a>
 </div>
 
 <!-- KPI Row -->
@@ -131,6 +165,45 @@ include APP_ROOT . '/includes/header.php';
         </div>
     </div>
 </div>
+
+<?php if ($periStats || $spedStats): ?>
+<div class="row g-4 mt-0">
+    <?php if ($periStats): ?>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-hdd-network me-2 text-info"></i>Periferiche per Stato</h6></div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    <?php foreach ($periStats as $stato => $cnt): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                        <span class="small"><?= getPerifericaStatoBadge($stato) ?></span>
+                        <span class="badge bg-secondary"><?= (int)$cnt ?></span>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    <?php if ($spedStats): ?>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>Spedizioni per Stato</h6></div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    <?php foreach ($spedStats as $status => $cnt): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                        <span class="small"><?= getSpedizioneStatusBadge($status) ?></span>
+                        <span class="badge bg-secondary"><?= (int)$cnt ?></span>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <script>
 const monthlyLabels = <?= json_encode(array_column($monthly, 'month')) ?>;

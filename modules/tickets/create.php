@@ -35,6 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
 
     if (!$errors) {
+        // Auto-assign if enabled and no assignee selected
+        if (!$assigned_to && getSetting('auto_assign', '0') === '1') {
+            $assigned_to = getAutoAssignee();
+        }
         $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, status) VALUES (?,?,?,?,?,?,?,?,?,'open')");
         $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario]);
         $newId = $db->lastInsertId();
@@ -111,12 +115,18 @@ include APP_ROOT . '/includes/header.php';
         <?php if (isTechnician()): ?>
         <div class="col-md-4">
             <label class="form-label fw-semibold">Assegna a</label>
-            <select name="assigned_to" class="form-select">
-                <option value="">-- Non assegnato --</option>
-                <?php foreach ($technicians as $tech): ?>
-                <option value="<?= $tech['id'] ?>" <?= ($_POST['assigned_to'] ?? '') == $tech['id'] ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
+            <div class="input-group">
+                <select name="assigned_to" class="form-select" id="assignedToSelect">
+                    <option value="">-- Non assegnato --</option>
+                    <?php foreach ($technicians as $tech): ?>
+                    <option value="<?= $tech['id'] ?>" <?= ($_POST['assigned_to'] ?? '') == $tech['id'] ? 'selected' : '' ?>><?= h($tech['full_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="button" class="btn btn-outline-secondary" id="autoAssignBtn" title="Auto-assegna al tecnico meno carico">
+                    <i class="bi bi-magic"></i>
+                </button>
+            </div>
+            <div class="form-text">Clicca <i class="bi bi-magic"></i> per assegnare automaticamente al tecnico meno carico.</div>
         </div>
         <?php endif; ?>
     </div>
@@ -154,5 +164,30 @@ include APP_ROOT . '/includes/header.php';
 
 </div>
 </div>
+
+<?php
+$autoAssigneeId = isTechnician() ? getAutoAssignee() : null;
+?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var autoAssignBtn = document.getElementById('autoAssignBtn');
+    if (autoAssignBtn) {
+        var autoId = <?= json_encode($autoAssigneeId) ?>;
+        autoAssignBtn.addEventListener('click', function() {
+            if (autoId) {
+                document.getElementById('assignedToSelect').value = autoId;
+                autoAssignBtn.classList.add('btn-success');
+                autoAssignBtn.classList.remove('btn-outline-secondary');
+                setTimeout(function() {
+                    autoAssignBtn.classList.remove('btn-success');
+                    autoAssignBtn.classList.add('btn-outline-secondary');
+                }, 1500);
+            } else {
+                alert('Nessun tecnico disponibile.');
+            }
+        });
+    }
+});
+</script>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
