@@ -44,6 +44,7 @@ function getModuleUrl(string $slug): string {
         'rapportini'  => APP_URL . '/modules/rapportini/index.php',
         'periferiche' => APP_URL . '/modules/periferiche/index.php',
         'spedizioni'  => APP_URL . '/modules/spedizioni/index.php',
+        'componenti'  => APP_URL . '/modules/componenti/index.php',
     ];
     return $urls[$slug] ?? '#';
 }
