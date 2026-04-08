@@ -37,6 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dealer_id = (int)($_POST['dealer_id'] ?? 0) ?: null;
     $location_id = (int)($_POST['location_id'] ?? 0) ?: null;
     $codice_concessionario = trim($_POST['codice_concessionario'] ?? '') ?: null;
+    $tipo_intervento = $_POST['tipo_intervento'] ?? 'onsite';
+    if (!in_array($tipo_intervento, ['onsite','onsite_sostituzione','solo_spedizione'])) $tipo_intervento = 'onsite';
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!$description) $errors[] = 'La descrizione è obbligatoria.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
@@ -46,10 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$assigned_to && getSetting('auto_assign', '0') === '1') {
             $assigned_to = getAutoAssignee();
         }
-        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, status) VALUES (?,?,?,?,?,?,?,?,?,'open')");
-        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario]);
+        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, tipo_intervento, status) VALUES (?,?,?,?,?,?,?,?,?,?,'open')");
+        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario, $tipo_intervento]);
         $newId = $db->lastInsertId();
-        logActivity($user['id'], 'create', 'ticket', $newId, "Creato ticket: $title");
+        logActivity($user['id'], 'create', 'ticket', $newId, "Creato ticket ($tipo_intervento): $title");
         $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $newId;
         $prefix = getTicketPrefix() . '-' . str_pad($newId, 4, '0', STR_PAD_LEFT);
         // Notify admins (excluding the creator if they are admin)
@@ -59,6 +61,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Notify assigned technician
         if ($assigned_to && $assigned_to != $user['id'] && getSetting('notif_ticket_assign', '1') === '1') {
             createNotification($assigned_to, 'assign', 'Ticket assegnato a te: ' . $prefix, $title, 'ticket', $newId, $ticketUrl);
+        }
+        // For solo_spedizione: auto-create a shipping record in sala
+        if ($tipo_intervento === 'solo_spedizione' && isModuleEnabled('spedizioni')) {
+            $spedStmt = $db->prepare("INSERT INTO spedizioni (status, ticket_id, dealer_id, location_id, note, created_by) VALUES ('da_spedire',?,?,?,?,?)");
+            $spedNote = 'Spedizione automatica da ticket ' . $prefix;
+            $spedStmt->execute([$newId, $dealer_id, $location_id, $spedNote, $user['id']]);
+            $spedId = $db->lastInsertId();
+            logActivity($user['id'], 'create', 'spedizione', (int)$spedId, "Spedizione automatica per ticket $prefix");
+            header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $newId . '&created=1&spedizione_creata=1');
+            exit;
         }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $newId . '&created=1');
         exit;
@@ -97,6 +109,17 @@ include APP_ROOT . '/includes/header.php';
     border-radius: 50%;
     background: rgba(59,130,246,.12);
 }
+.tipo-intervento-option { display: none; }
+.tipo-intervento-label {
+    transition: all .2s;
+    background: #f8f9fa;
+    border-color: #dee2e6 !important;
+}
+.tipo-intervento-option:checked + .tipo-intervento-label {
+    background: #fff;
+    box-shadow: 0 0 0 2px var(--bs-primary);
+    border-color: var(--bs-primary) !important;
+}
 </style>
 
 <div class="create-ticket-header animate-fade-in">
@@ -127,6 +150,47 @@ include APP_ROOT . '/includes/header.php';
 
 <form method="post" id="createTicketForm">
 <?= csrfField() ?>
+
+<!-- Sezione 0: Tipo di Intervento -->
+<div class="form-section animate-fade-in" style="animation-delay:.02s">
+    <div class="form-section-title">
+        <i class="bi bi-signpost-split"></i> Tipo di Intervento
+    </div>
+    <div class="d-flex gap-3 flex-wrap" id="tipoInterventoCards">
+        <?php
+        $currentTipo = $_POST['tipo_intervento'] ?? 'onsite';
+        $tipiIntervento = [
+            'onsite'              => ['icon' => 'bi-house-door-fill',  'label' => 'Onsite',                'desc' => 'Intervento in loco senza sostituzione componenti', 'color' => 'info'],
+            'onsite_sostituzione' => ['icon' => 'bi-arrow-repeat',      'label' => 'Onsite + Sostituzione', 'desc' => 'Intervento con sostituzione spare parts / accessori / cavi', 'color' => 'warning'],
+            'solo_spedizione'     => ['icon' => 'bi-truck-front-fill',  'label' => 'Solo Spedizione',       'desc' => 'Spedizione ricambi – genera automaticamente ticket di spedizione', 'color' => 'primary'],
+        ];
+        foreach ($tipiIntervento as $val => $ti):
+        ?>
+        <input type="radio" name="tipo_intervento" value="<?= $val ?>" id="tipo_<?= $val ?>"
+               class="tipo-intervento-option" <?= $currentTipo === $val ? 'checked' : '' ?>>
+        <label for="tipo_<?= $val ?>" class="tipo-intervento-label border rounded-3 p-3 flex-fill cursor-pointer"
+               style="min-width:200px;cursor:pointer">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi <?= $ti['icon'] ?> fs-5 text-<?= $ti['color'] ?>"></i>
+                <strong class="text-<?= $ti['color'] ?>"><?= $ti['label'] ?></strong>
+            </div>
+            <div class="text-muted small"><?= $ti['desc'] ?></div>
+        </label>
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<!-- Alert solo_spedizione -->
+<div id="alertSoloSpedizione" class="alert alert-primary animate-fade-in d-none" style="animation-delay:.03s">
+    <i class="bi bi-truck-front-fill me-2"></i>
+    <strong>Solo Spedizione:</strong> verrà creato un ticket e una spedizione in stato <em>Da Spedire</em> automaticamente collegata. Potrai aggiungere tracking e corriere dalla pagina della spedizione.
+</div>
+
+<!-- Alert onsite_sostituzione -->
+<div id="alertOnsiteSostituzione" class="alert alert-warning animate-fade-in d-none" style="animation-delay:.03s">
+    <i class="bi bi-arrow-repeat me-2"></i>
+    <strong>Onsite + Sostituzione:</strong> dopo la creazione del ticket potrai aggiungere le spare parts, gli accessori e i cavi da inviare nella sezione <em>Componenti Inviati</em>.
+</div>
 
 <!-- Sezione 1: Informazioni principali -->
 <div class="form-section animate-fade-in" style="animation-delay:.05s">
@@ -255,7 +319,7 @@ include APP_ROOT . '/includes/header.php';
 <!-- Azioni -->
 <div class="d-flex gap-3 animate-fade-in" style="animation-delay:.3s">
     <button type="submit" class="btn btn-primary btn-lg px-4" id="submitBtn">
-        <i class="bi bi-check-lg me-2"></i>Crea Ticket
+        <i class="bi bi-check-lg me-2"></i><span id="submitLabel">Crea Ticket</span>
     </button>
     <a href="<?= APP_URL ?>/modules/tickets/index.php" class="btn btn-outline-secondary btn-lg">
         <i class="bi bi-x-lg me-1"></i>Annulla
@@ -286,6 +350,32 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Tipo Intervento logic
+    var tipoRadios = document.querySelectorAll('input[name="tipo_intervento"]');
+    var alertSoloSped = document.getElementById('alertSoloSpedizione');
+    var alertOnsiteSost = document.getElementById('alertOnsiteSostituzione');
+    var submitLabel = document.getElementById('submitLabel');
+
+    function onTipoChange(val) {
+        if (alertSoloSped) alertSoloSped.classList.toggle('d-none', val !== 'solo_spedizione');
+        if (alertOnsiteSost) alertOnsiteSost.classList.toggle('d-none', val !== 'onsite_sostituzione');
+        if (submitLabel) {
+            if (val === 'solo_spedizione') {
+                submitLabel.textContent = 'Crea Ticket + Spedizione';
+            } else {
+                submitLabel.textContent = 'Crea Ticket';
+            }
+        }
+    }
+
+    tipoRadios.forEach(function(r) {
+        r.addEventListener('change', function() { onTipoChange(this.value); });
+    });
+
+    // Init on page load
+    var checked = document.querySelector('input[name="tipo_intervento"]:checked');
+    if (checked) onTipoChange(checked.value);
 });
 </script>
 

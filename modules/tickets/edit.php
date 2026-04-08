@@ -29,13 +29,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $category_id = (int)($_POST['category_id'] ?? 0) ?: null;
     $assigned_to = (int)($_POST['assigned_to'] ?? 0) ?: null;
     $codice_concessionario = trim($_POST['codice_concessionario'] ?? '') ?: null;
+    $tipo_intervento = $_POST['tipo_intervento'] ?? $ticket['tipo_intervento'] ?? 'onsite';
+    if (!in_array($tipo_intervento, ['onsite','onsite_sostituzione','solo_spedizione'])) $tipo_intervento = 'onsite';
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!in_array($status, ['open','in_progress','waiting','resolved','closed'])) $errors[] = 'Stato non valido.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
     if (!$errors) {
         $closedAt = in_array($status, ['resolved','closed']) && !$ticket['closed_at'] ? ', closed_at=NOW()' : '';
-        $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, category_id=?, assigned_to=?, codice_concessionario=?, updated_at=NOW()$closedAt WHERE id=?");
-        $stmt->execute([$title, $description, $status, $priority, $category_id, $assigned_to, $codice_concessionario, $id]);
+        $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, category_id=?, assigned_to=?, codice_concessionario=?, tipo_intervento=?, updated_at=NOW()$closedAt WHERE id=?");
+        $stmt->execute([$title, $description, $status, $priority, $category_id, $assigned_to, $codice_concessionario, $tipo_intervento, $id]);
         logActivity($user['id'], 'edit', 'ticket', $id, "Modificato ticket: $title");
         $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $id;
         $prefix = getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
@@ -60,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '&updated=1');
         exit;
     }
-    $ticket = array_merge($ticket, ['title'=>$title,'description'=>$description,'status'=>$status,'priority'=>$priority,'category_id'=>$category_id,'assigned_to'=>$assigned_to,'codice_concessionario'=>$codice_concessionario]);
+    $ticket = array_merge($ticket, ['title'=>$title,'description'=>$description,'status'=>$status,'priority'=>$priority,'category_id'=>$category_id,'assigned_to'=>$assigned_to,'codice_concessionario'=>$codice_concessionario,'tipo_intervento'=>$tipo_intervento]);
 }
 
 $categories = $db->query("SELECT * FROM ticket_categories ORDER BY name")->fetchAll();
@@ -138,6 +140,15 @@ include APP_ROOT . '/includes/header.php';
                 <?php endforeach; ?>
             </select>
         </div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Tipo di Intervento</label>
+        <select name="tipo_intervento" class="form-select">
+            <?php $curTipo = $ticket['tipo_intervento'] ?? 'onsite'; ?>
+            <option value="onsite" <?= $curTipo==='onsite'?'selected':'' ?>>Onsite</option>
+            <option value="onsite_sostituzione" <?= $curTipo==='onsite_sostituzione'?'selected':'' ?>>Onsite + Sostituzione (spare parts / accessori / cavi)</option>
+            <option value="solo_spedizione" <?= $curTipo==='solo_spedizione'?'selected':'' ?>>Solo Spedizione</option>
+        </select>
     </div>
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salva Modifiche</button>
