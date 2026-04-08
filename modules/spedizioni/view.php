@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/modules.php';
+require_once __DIR__ . '/../../includes/brt_api.php';
 
 requireLogin();
 if (!isModuleEnabled('spedizioni')) { header('Location: ' . APP_URL . '/dashboard.php'); exit; }
@@ -33,6 +34,10 @@ $stmt->execute([$id]);
 $s = $stmt->fetch();
 if (!$s) { header('Location: ' . APP_URL . '/modules/spedizioni/index.php'); exit; }
 
+$hasBrt      = !empty($s['brt_parcel_id']);
+$hasLabel    = !empty($s['brt_label_stream']);
+$brtApiReady = (getBrtApi() !== null);
+
 define('PAGE_TITLE', 'Spedizione #' . $id);
 define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Spedizioni' => APP_URL.'/modules/spedizioni/index.php', '#'.$id => '']);
 
@@ -50,12 +55,16 @@ include APP_ROOT . '/includes/header.php';
     <div>
         <h4 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>Spedizione #<?= $id ?>
             <?= getSpedizioneStatusBadge($s['status']) ?>
+            <?php if ($hasBrt): ?><span class="badge bg-primary bg-opacity-75 ms-1"><i class="bi bi-truck me-1"></i>BRT</span><?php endif; ?>
         </h4>
         <?php if ($s['tracking_number']): ?>
         <span class="font-monospace text-muted"><?= h($s['tracking_number']) ?><?php if ($s['corriere']): ?> &mdash; <?= h($s['corriere']) ?><?php endif; ?></span>
         <?php endif; ?>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
+        <?php if ($hasLabel): ?>
+        <a href="<?= APP_URL ?>/api/brt_label.php?id=<?= $id ?>" class="btn btn-outline-primary btn-sm" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>Etichetta BRT</a>
+        <?php endif; ?>
         <?php if (isTechnician()): ?>
         <a href="<?= APP_URL ?>/modules/spedizioni/edit.php?id=<?= $id ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Modifica</a>
         <?php endif; ?>
@@ -74,6 +83,9 @@ include APP_ROOT . '/includes/header.php';
                         <tr><td class="fw-semibold bg-light">Stato</td><td><?= getSpedizioneStatusBadge($s['status']) ?></td></tr>
                         <tr><td class="fw-semibold bg-light">Tracking</td><td class="font-monospace"><?= $s['tracking_number'] ? h($s['tracking_number']) : '<span class="text-muted">N/D</span>' ?></td></tr>
                         <tr><td class="fw-semibold bg-light">Corriere</td><td><?= $s['corriere'] ? h($s['corriere']) : '<span class="text-muted">-</span>' ?></td></tr>
+                        <?php if ($hasBrt): ?>
+                        <tr><td class="fw-semibold bg-light">BRT Parcel ID</td><td class="font-monospace"><?= h($s['brt_parcel_id']) ?></td></tr>
+                        <?php endif; ?>
                         <?php if ($s['data_spedizione']): ?>
                         <tr><td class="fw-semibold bg-light">Data Spedizione</td><td><?= formatDate($s['data_spedizione'], 'd/m/Y') ?></td></tr>
                         <?php endif; ?>
@@ -89,6 +101,21 @@ include APP_ROOT . '/includes/header.php';
                 </table>
             </div>
         </div>
+
+        <?php if ($hasBrt && $brtApiReady): ?>
+        <!-- BRT Tracking Panel -->
+        <div class="card border-0 shadow-sm mb-4" id="brtTrackingCard">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-geo-alt me-2 text-primary"></i>Tracking BRT</h6>
+                <button class="btn btn-sm btn-outline-primary" id="brtRefreshBtn" title="Aggiorna tracking">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Aggiorna
+                </button>
+            </div>
+            <div class="card-body" id="brtTrackingBody">
+                <p class="text-muted mb-0"><i class="bi bi-info-circle me-1"></i>Clicca "Aggiorna" per caricare gli eventi di tracking da BRT.</p>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <div class="col-lg-5">
@@ -135,5 +162,71 @@ include APP_ROOT . '/includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($hasBrt && $brtApiReady):
+$csrfToken = generateCsrfToken();
+$extraJs = '<script>
+(function() {
+    var CSRF = ' . json_encode($csrfToken) . ';
+    var SPED_ID = ' . (int)$id . ';
+    var appUrl = ' . json_encode(APP_URL) . ';
+
+    document.getElementById("brtRefreshBtn").addEventListener("click", function() {
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>Caricamento...\';
+        fetch(appUrl + "/api/brt_track.php", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({id: SPED_ID, csrf_token: CSRF})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = \'<i class="bi bi-arrow-clockwise me-1"></i>Aggiorna\';
+            var body = document.getElementById("brtTrackingBody");
+            if (!data.success) {
+                body.innerHTML = \'<div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle me-2"></i>\' + (data.error || "Errore") + \'</div>\';
+                return;
+            }
+            var t = data.data;
+            var html = "";
+
+            // Shipment info
+            if (t.dati_spedizione || t.recapito_dest) {
+                var dest = t.recapito_dest || {};
+                html += \'<div class="mb-3"><strong>Destinatario:</strong> \' + (dest.ragione_sociale || "") + " " + (dest.localita || "") + \'</div>\';
+            }
+
+            if (data.isDelivered) {
+                html += \'<div class="alert alert-success py-2 mb-3"><i class="bi bi-check-circle me-2"></i><strong>Consegnato!</strong></div>\';
+            }
+
+            // Events
+            var evts = t.eventi ? (t.eventi.evento || []) : [];
+            if (!Array.isArray(evts)) evts = [evts];
+            if (evts.length) {
+                html += \'<h6 class="mb-2">Eventi</h6><ul class="list-group list-group-flush">\';
+                evts.forEach(function(e) {
+                    html += \'<li class="list-group-item px-0 py-2"><span class="text-muted small me-2">\' + (e.data || "") + " " + (e.ora || "") + \'</span><strong>\' + (e.descrizione || "") + \'</strong>\';
+                    if (e.filiale) html += \' <span class="text-muted small">— \' + e.filiale + \'</span>\';
+                    html += \'</li>\';
+                });
+                html += \'</ul>\';
+            } else {
+                html += \'<p class="text-muted mb-0">Nessun evento disponibile.</p>\';
+            }
+            body.innerHTML = html;
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = \'<i class="bi bi-arrow-clockwise me-1"></i>Aggiorna\';
+            document.getElementById("brtTrackingBody").innerHTML = \'<div class="alert alert-danger mb-0">Errore di connessione.</div>\';
+        });
+    });
+}());
+</script>';
+endif;
+?>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
