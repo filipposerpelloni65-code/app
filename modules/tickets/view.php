@@ -106,6 +106,58 @@ if (isModuleEnabled('periferiche')) {
     $perifericheLinked = $pgStmt->fetchAll();
 }
 
+// Handle add componente
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_componente' && isTechnician()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
+    $modello_id   = (int)($_POST['modello_id'] ?? 0);
+    $seriale_nuovo = trim($_POST['seriale_nuovo'] ?? '') ?: null;
+    $quantita     = max(1, (int)($_POST['quantita'] ?? 1));
+    $note_comp    = trim($_POST['note_comp'] ?? '') ?: null;
+    if (!$modello_id) { $errors[] = 'Seleziona un modello.'; }
+    if (!$errors) {
+        // Fetch tipo from model
+        $mStmt = $db->prepare("SELECT tipo FROM modelli_componenti WHERE id=? AND active=1");
+        $mStmt->execute([$modello_id]);
+        $mRow = $mStmt->fetch();
+        if (!$mRow) {
+            $errors[] = 'Modello non trovato o non attivo.';
+        } else {
+            $tipo_comp = $mRow['tipo'];
+            // Seriale is required only for periferiche
+            if ($tipo_comp === 'periferica' && !$seriale_nuovo) {
+                $errors[] = 'Il seriale nuovo è obbligatorio per le periferiche.';
+            } else {
+                if ($tipo_comp !== 'periferica') { $seriale_nuovo = null; }
+                $db->prepare("INSERT INTO ticket_componenti (ticket_id, modello_id, tipo, seriale_nuovo, quantita, note, created_by) VALUES (?,?,?,?,?,?,?)")
+                   ->execute([$id, $modello_id, $tipo_comp, $seriale_nuovo, $quantita, $note_comp, $user['id']]);
+                $db->prepare("UPDATE tickets SET updated_at=NOW() WHERE id=?")->execute([$id]);
+                logActivity($user['id'], 'add_componente', 'ticket', $id, "Aggiunto componente ($tipo_comp) al ticket");
+                header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#componenti');
+                exit;
+            }
+        }
+    }
+}
+
+// Handle delete componente
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_componente' && isTechnician()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
+    $comp_id = (int)($_POST['comp_id'] ?? 0);
+    if ($comp_id && !$errors) {
+        $db->prepare("DELETE FROM ticket_componenti WHERE id=? AND ticket_id=?")->execute([$comp_id, $id]);
+        header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#componenti');
+        exit;
+    }
+}
+
+// Fetch componenti for this ticket
+$componentiStmt = $db->prepare("SELECT tc.*, mc.nome AS modello_nome, mc.marca AS modello_marca, u.full_name AS aggiunto_da FROM ticket_componenti tc JOIN modelli_componenti mc ON tc.modello_id=mc.id JOIN users u ON tc.created_by=u.id WHERE tc.ticket_id=? ORDER BY tc.created_at ASC");
+$componentiStmt->execute([$id]);
+$componenti = $componentiStmt->fetchAll();
+
+// Modelli for add-form
+$modelliDisponibili = $db->query("SELECT id, tipo, nome, marca FROM modelli_componenti WHERE active=1 ORDER BY tipo, nome")->fetchAll();
+
 define('PAGE_TITLE', 'Ticket ' . getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT));
 define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Ticket' => APP_URL.'/modules/tickets/index.php', 'Dettaglio' => '']);
 
@@ -277,6 +329,112 @@ include APP_ROOT . '/includes/header.php';
         </div>
         <?php endif; ?>
 
+        <!-- Componenti Inviati (Periferiche / Accessori / Cavi) -->
+        <div class="card border-0 shadow-sm mb-4" id="componenti">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-cpu me-2 text-primary"></i>Componenti Inviati (<?= count($componenti) ?>)</h6>
+            </div>
+            <?php if ($componenti): ?>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Modello</th>
+                            <th>Seriale Nuovo</th>
+                            <th>Qtà</th>
+                            <th>Note</th>
+                            <th>Aggiunto da</th>
+                            <?php if (isTechnician()): ?><th></th><?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($componenti as $comp): ?>
+                    <tr>
+                        <td><?= getComponenteTipoBadge($comp['tipo']) ?></td>
+                        <td class="fw-semibold small">
+                            <?= h($comp['modello_nome']) ?>
+                            <?php if ($comp['modello_marca']): ?><span class="text-muted fw-normal"> — <?= h($comp['modello_marca']) ?></span><?php endif; ?>
+                        </td>
+                        <td class="font-monospace small">
+                            <?php if ($comp['tipo'] === 'periferica'): ?>
+                                <?= $comp['seriale_nuovo'] ? '<span class="text-success fw-semibold">' . h($comp['seriale_nuovo']) . '</span>' : '<span class="text-muted">-</span>' ?>
+                            <?php else: ?>
+                                <span class="text-muted small fst-italic">n/a</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= (int)$comp['quantita'] ?></td>
+                        <td class="small text-muted"><?= $comp['note'] ? h($comp['note']) : '-' ?></td>
+                        <td class="small"><?= h($comp['aggiunto_da']) ?></td>
+                        <?php if (isTechnician()): ?>
+                        <td>
+                            <form method="post" onsubmit="return confirm('Rimuovere questo componente?')">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="delete_componente">
+                                <input type="hidden" name="comp_id" value="<?= $comp['id'] ?>">
+                                <button type="submit" class="btn btn-outline-danger btn-sm py-0" title="Rimuovi"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                        <?php endif; ?>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+            <?php if (isTechnician() && !in_array($ticket['status'], ['closed'])): ?>
+            <div class="card-footer bg-white">
+                <?php if (!$componenti): ?>
+                <p class="small text-muted mb-2">Nessun componente inviato per questo ticket.</p>
+                <?php endif; ?>
+                <form method="post" id="formAddComponente">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="add_componente">
+                    <div class="row g-2 align-items-end mb-2">
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold mb-1">Modello <span class="text-danger">*</span></label>
+                            <select name="modello_id" class="form-select form-select-sm" id="selectModello" required onchange="onModelloChange(this)">
+                                <option value="">-- Seleziona modello --</option>
+                                <?php
+                                $tipoGroups = ['periferica' => 'Periferiche', 'accessorio' => 'Accessori', 'cavo' => 'Cavi'];
+                                $lastTipo = null;
+                                foreach ($modelliDisponibili as $md):
+                                    if ($md['tipo'] !== $lastTipo):
+                                        if ($lastTipo !== null) echo '</optgroup>';
+                                        echo '<optgroup label="' . h($tipoGroups[$md['tipo']] ?? $md['tipo']) . '">';
+                                        $lastTipo = $md['tipo'];
+                                    endif;
+                                ?>
+                                <option value="<?= $md['id'] ?>" data-tipo="<?= h($md['tipo']) ?>">
+                                    <?= h($md['nome']) ?><?= $md['marca'] ? ' (' . h($md['marca']) . ')' : '' ?>
+                                </option>
+                                <?php endforeach; ?>
+                                <?php if ($lastTipo !== null) echo '</optgroup>'; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3" id="fieldSeriale" style="display:none">
+                            <label class="form-label small fw-semibold mb-1">Seriale Nuovo <span class="text-danger">*</span></label>
+                            <input type="text" name="seriale_nuovo" id="inputSeriale" class="form-control form-control-sm font-monospace" placeholder="Seriale...">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold mb-1">Qtà</label>
+                            <input type="number" name="quantita" class="form-control form-control-sm" min="1" value="1">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold mb-1">Note</label>
+                            <input type="text" name="note_comp" class="form-control form-control-sm" placeholder="(opz.)">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Aggiungi Componente</button>
+                </form>
+            </div>
+            <?php elseif (!$componenti): ?>
+            <div class="card-body text-center text-muted small py-3">
+                <i class="bi bi-cpu d-block mb-1 fs-4 opacity-50"></i>Nessun componente inviato.
+            </div>
+            <?php endif; ?>
+        </div>
+
         <!-- Periferiche Collegate -->
         <?php if (isModuleEnabled('periferiche')): ?>
         <div class="card border-0 shadow-sm">
@@ -389,5 +547,21 @@ include APP_ROOT . '/includes/header.php';
 </div>
 
 <style>.user-avatar-sm{width:28px;height:28px;font-size:.75rem;line-height:28px;border-radius:50%;background:var(--bs-primary);color:#fff;text-align:center;display:inline-block;}</style>
+<script>
+function onModelloChange(sel) {
+    var opt = sel.options[sel.selectedIndex];
+    var tipo = opt ? opt.getAttribute('data-tipo') : '';
+    var fieldSeriale = document.getElementById('fieldSeriale');
+    var inputSeriale = document.getElementById('inputSeriale');
+    if (tipo === 'periferica') {
+        fieldSeriale.style.display = '';
+        inputSeriale.setAttribute('required', 'required');
+    } else {
+        fieldSeriale.style.display = 'none';
+        inputSeriale.removeAttribute('required');
+        inputSeriale.value = '';
+    }
+}
+</script>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
