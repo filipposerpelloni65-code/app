@@ -20,6 +20,26 @@ function requireLogin(): void {
         header('Location: ' . APP_URL . '/login.php');
         exit;
     }
+    // Apply session timeout from settings
+    try {
+        $db = getDB();
+        $stmt = $db->prepare('SELECT setting_value FROM settings WHERE setting_key = ?');
+        $stmt->execute(['session_timeout_mins']);
+        $row = $stmt->fetch();
+        $timeoutMins = $row ? (int)$row['setting_value'] : 0;
+        if ($timeoutMins > 0) {
+            $now = time();
+            if (isset($_SESSION['_last_activity']) && ($now - $_SESSION['_last_activity']) > ($timeoutMins * 60)) {
+                $_SESSION = [];
+                session_destroy();
+                header('Location: ' . APP_URL . '/login.php?timeout=1');
+                exit;
+            }
+            $_SESSION['_last_activity'] = $now;
+        }
+    } catch (Exception $e) {
+        // Fail silently — don't block access if settings table doesn't exist yet
+    }
 }
 
 function requireRole(string ...$roles): void {

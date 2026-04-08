@@ -10,6 +10,9 @@ if (isLoggedIn()) {
 }
 
 $error = '';
+if (($_GET['timeout'] ?? '') === '1') {
+    $error = 'Sessione scaduta per inattività. Effettua nuovamente il login.';
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';

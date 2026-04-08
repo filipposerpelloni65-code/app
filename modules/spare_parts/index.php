@@ -117,7 +117,7 @@ include APP_ROOT . '/includes/header.php';
                             <span class="fw-bold <?= $lowStock ? 'text-danger' : 'text-success' ?>"><?= (int)$p['quantity'] ?></span>
                         </td>
                         <td class="small text-muted"><?= (int)$p['min_quantity'] ?></td>
-                        <td class="small"><?= $p['unit_price'] ? '€ ' . number_format($p['unit_price'], 2, ',', '.') : '-' ?></td>
+                        <td class="small"><?= $p['unit_price'] ? htmlspecialchars(getSetting('currency_symbol', '€')) . ' ' . number_format($p['unit_price'], 2, ',', '.') : '-' ?></td>
                         <td>
                             <div class="btn-group btn-group-sm">
                                 <a href="<?= APP_URL ?>/modules/spare_parts/view.php?id=<?= $p['id'] ?>" class="btn btn-outline-primary" title="Visualizza"><i class="bi bi-eye"></i></a>

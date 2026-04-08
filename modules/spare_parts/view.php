@@ -107,7 +107,7 @@ include APP_ROOT . '/includes/header.php';
                     <dt class="col-sm-5">Posizione</dt>
                     <dd class="col-sm-7"><?= $part['location'] ? h($part['location']) : '-' ?></dd>
                     <dt class="col-sm-5">Prezzo</dt>
-                    <dd class="col-sm-7"><?= $part['unit_price'] ? '€ ' . number_format((float)$part['unit_price'], 2, ',', '.') : '-' ?></dd>
+                    <dd class="col-sm-7"><?= $part['unit_price'] ? htmlspecialchars(getSetting('currency_symbol', '€')) . ' ' . number_format((float)$part['unit_price'], 2, ',', '.') : '-' ?></dd>
                     <dt class="col-sm-5">Quantità</dt>
                     <dd class="col-sm-7"><span class="fw-bold fs-5 <?= $lowStock ? 'text-danger' : 'text-success' ?>"><?= (int)$part['quantity'] ?></span></dd>
                     <dt class="col-sm-5">Min. Scorta</dt>

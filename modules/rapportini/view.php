@@ -198,7 +198,27 @@ include APP_ROOT . '/includes/header.php';
                 <!-- Document Header -->
                 <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-4">
                     <div>
+                        <?php
+                        $companyLogoUrl  = getSetting('company_logo_url', '');
+                        $companyAddress  = getSetting('company_address', '');
+                        $companyCity     = getSetting('company_city', '');
+                        $companyVat      = getSetting('company_vat', '');
+                        $companyPhone    = getSetting('company_phone', '');
+                        $companyEmailSet = getSetting('company_email', '');
+                        ?>
+                        <?php if ($companyLogoUrl): ?>
+                        <img src="<?= h($companyLogoUrl) ?>" alt="Logo" style="max-height:48px;max-width:120px;object-fit:contain;" class="mb-1 d-block">
+                        <?php endif; ?>
                         <div class="fw-bold fs-5"><?= h($appName) ?></div>
+                        <?php if ($companyAddress || $companyCity): ?>
+                        <div class="text-muted small"><?= h(trim($companyAddress . ($companyCity ? ', '.$companyCity : ''))) ?></div>
+                        <?php endif; ?>
+                        <?php if ($companyVat): ?>
+                        <div class="text-muted small">P.IVA: <?= h($companyVat) ?></div>
+                        <?php endif; ?>
+                        <?php if ($companyPhone || $companyEmailSet): ?>
+                        <div class="text-muted small"><?= h(implode(' — ', array_filter([$companyPhone, $companyEmailSet]))) ?></div>
+                        <?php endif; ?>
                         <div class="text-muted small">Rapportino di Lavoro</div>
                     </div>
                     <div class="text-end">
@@ -281,6 +301,11 @@ include APP_ROOT . '/includes/header.php';
                 <div class="sig-box border rounded p-3 mb-3 text-muted text-center" style="min-height:70px">
                     <em>Non ancora firmato</em>
                 </div>
+                <?php endif; ?>
+
+                <?php $pdfFooter = getSetting('pdf_footer_text', ''); if ($pdfFooter): ?>
+                <hr class="mt-4">
+                <div class="small text-muted text-center"><?= h($pdfFooter) ?></div>
                 <?php endif; ?>
 
             </div>

@@ -9,6 +9,35 @@ $enabledModules = getEnabledModules();
 $currentScript = basename($_SERVER['PHP_SELF']);
 $currentPath = $_SERVER['PHP_SELF'] ?? '';
 $notifCounts = $currentUser ? getNotificationCounts() : [];
+
+// ── Apply timezone from settings ──────────────────────────────────────────
+$_tz = getSetting('app_timezone', 'Europe/Rome');
+if ($_tz && in_array($_tz, DateTimeZone::listIdentifiers())) {
+    date_default_timezone_set($_tz);
+}
+
+// ── Load theme settings ───────────────────────────────────────────────────
+$_themePrimary       = getSetting('theme_primary_color', '#3b82f6');
+$_themeSidebarTop    = getSetting('theme_sidebar_top', '#0f172a');
+$_themeSidebarBottom = getSetting('theme_sidebar_bottom', '#1a1f35');
+$_themeBg            = getSetting('theme_bg_color', '#f1f5f9');
+$_themeRadius        = getSetting('theme_radius', 'md');
+$_themeFontSize      = getSetting('theme_font_size', 'default');
+$_companyLogoUrl     = getSetting('company_logo_url', '');
+
+$_radiusMap = ['none' => '0px', 'sm' => '8px', 'md' => '12px', 'lg' => '16px', 'xl' => '24px'];
+$_radiusVal = $_radiusMap[$_themeRadius] ?? '12px';
+$_fontSizeMap = ['small' => '0.8rem', 'default' => '0.9rem', 'large' => '1rem'];
+$_fontSizeVal = $_fontSizeMap[$_themeFontSize] ?? '0.9rem';
+
+// Validate colors (must be hex to avoid XSS)
+function _validHex(string $c, string $fallback): string {
+    return preg_match('/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/', $c) ? $c : $fallback;
+}
+$_themePrimary       = _validHex($_themePrimary, '#3b82f6');
+$_themeSidebarTop    = _validHex($_themeSidebarTop, '#0f172a');
+$_themeSidebarBottom = _validHex($_themeSidebarBottom, '#1a1f35');
+$_themeBg            = _validHex($_themeBg, '#f1f5f9');
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -24,6 +53,31 @@ $notifCounts = $currentUser ? getNotificationCounts() : [];
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/app.css">
+    <style>
+        :root {
+            --color-primary:     <?= $_themePrimary ?>;
+            --sidebar-bg:        <?= $_themeSidebarTop ?>;
+            --color-bg:          <?= $_themeBg ?>;
+            --radius-sm:         <?= $_radiusVal ?>;
+            --radius-md:         <?= $_radiusVal ?>;
+            --radius-lg:         <?= $_radiusVal ?>;
+        }
+        body { font-size: <?= $_fontSizeVal ?>; }
+        .sidebar { background: linear-gradient(180deg, <?= $_themeSidebarTop ?> 0%, <?= $_themeSidebarBottom ?> 100%) !important; }
+        .sidebar .nav-link.active { background-color: <?= $_themePrimary ?> !important; }
+        .btn-primary { background-color: <?= $_themePrimary ?>; border-color: <?= $_themePrimary ?>; }
+        .btn-primary:hover { filter: brightness(0.9); }
+        .btn-outline-primary { color: <?= $_themePrimary ?>; border-color: <?= $_themePrimary ?>; }
+        .btn-outline-primary:hover { background-color: <?= $_themePrimary ?>; border-color: <?= $_themePrimary ?>; color:#fff; }
+        .text-primary { color: <?= $_themePrimary ?> !important; }
+        .badge.bg-primary { background-color: <?= $_themePrimary ?> !important; }
+        .nav-link.active[data-bs-toggle="tab"] { color: <?= $_themePrimary ?> !important; border-bottom-color: <?= $_themePrimary ?> !important; }
+        .form-check-input:checked { background-color: <?= $_themePrimary ?>; border-color: <?= $_themePrimary ?>; }
+        a { color: <?= $_themePrimary ?>; }
+        a:hover { color: <?= $_themePrimary ?>; filter: brightness(0.8); }
+        .card { border-radius: <?= $_radiusVal ?> !important; }
+        .card-header { border-radius: <?= $_radiusVal ?> <?= $_radiusVal ?> 0 0 !important; }
+    </style>
 </head>
 <body>
 <?php if ($currentUser): ?>
@@ -31,7 +85,11 @@ $notifCounts = $currentUser ? getNotificationCounts() : [];
     <!-- Sidebar -->
     <nav id="sidebar" class="sidebar d-flex flex-column flex-shrink-0 p-3 text-white">
         <a href="<?= APP_URL ?>/dashboard.php" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+            <?php if (!empty($_companyLogoUrl)): ?>
+            <img src="<?= h($_companyLogoUrl) ?>" alt="Logo" style="max-height:32px;max-width:40px;object-fit:contain;" class="me-2">
+            <?php else: ?>
             <i class="bi bi-headset me-2 fs-4"></i>
+            <?php endif; ?>
             <span class="fs-5 fw-semibold"><?= h($appName) ?></span>
         </a>
         <hr>

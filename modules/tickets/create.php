@@ -8,6 +8,13 @@ require_once __DIR__ . '/../../includes/modules.php';
 requireLogin();
 if (!isModuleEnabled('tickets')) { header('Location: ' . APP_URL . '/dashboard.php'); exit; }
 
+// Check if non-admin technicians are allowed to create tickets
+$_canCreate = isAdmin() || (isTechnician() && getSetting('ticket_tech_create', '1') === '1');
+if (!$_canCreate) {
+    header('Location: ' . APP_URL . '/modules/tickets/index.php');
+    exit;
+}
+
 define('PAGE_TITLE', 'Nuovo Ticket');
 define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Ticket' => APP_URL.'/modules/tickets/index.php', 'Nuovo Ticket' => '']);
 
@@ -24,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido. Riprova.'; }
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
-    $priority = $_POST['priority'] ?? 'medium';
+    $priority = $_POST['priority'] ?? getSetting('ticket_default_priority', 'medium');
     $category_id = (int)($_POST['category_id'] ?? 0) ?: null;
     $assigned_to = (int)($_POST['assigned_to'] ?? 0) ?: null;
     $dealer_id = (int)($_POST['dealer_id'] ?? 0) ?: null;
@@ -46,9 +53,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $newId;
         $prefix = getTicketPrefix() . '-' . str_pad($newId, 4, '0', STR_PAD_LEFT);
         // Notify admins (excluding the creator if they are admin)
-        notifyAdmins('ticket', 'Nuovo ticket aperto: ' . $prefix, $title, 'ticket', $newId, $ticketUrl, $user['id']);
+        if (getSetting('notif_new_ticket', '1') === '1') {
+            notifyAdmins('ticket', 'Nuovo ticket aperto: ' . $prefix, $title, 'ticket', $newId, $ticketUrl, $user['id']);
+        }
         // Notify assigned technician
-        if ($assigned_to && $assigned_to != $user['id']) {
+        if ($assigned_to && $assigned_to != $user['id'] && getSetting('notif_ticket_assign', '1') === '1') {
             createNotification($assigned_to, 'assign', 'Ticket assegnato a te: ' . $prefix, $title, 'ticket', $newId, $ticketUrl);
         }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $newId . '&created=1');
@@ -164,7 +173,7 @@ include APP_ROOT . '/includes/header.php';
             'high'   => ['label' => 'Alta',    'icon' => 'bi-exclamation-circle',         'desc' => 'Richiede attenzione'],
             'urgent' => ['label' => 'Urgente', 'icon' => 'bi-exclamation-triangle-fill', 'desc' => 'Blocca l\'attività'],
         ];
-        $currentPriority = $_POST['priority'] ?? 'medium';
+        $currentPriority = $_POST['priority'] ?? getSetting('ticket_default_priority', 'medium');
         foreach ($priorities as $val => $p): ?>
         <input type="radio" name="priority" value="<?= $val ?>" id="prio_<?= $val ?>"
                class="priority-option" <?= $currentPriority === $val ? 'checked' : '' ?>>

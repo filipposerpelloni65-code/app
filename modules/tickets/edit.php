@@ -41,11 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $prefix = getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
         // Notify on assignment change
         $prevAssigned = $ticket['assigned_to'] ? (int)$ticket['assigned_to'] : 0;
-        if ($assigned_to && $assigned_to != $prevAssigned && $assigned_to != $user['id']) {
+        if ($assigned_to && $assigned_to != $prevAssigned && $assigned_to != $user['id'] && getSetting('notif_ticket_assign', '1') === '1') {
             createNotification($assigned_to, 'assign', 'Ticket assegnato a te: ' . $prefix, $title, 'ticket', $id, $ticketUrl);
         }
-        // Notify on status change
-        if ($status !== $ticket['status']) {
+        // Notify on status change (resolved/closed)
+        if ($status !== $ticket['status'] && in_array($status, ['resolved','closed']) && getSetting('notif_ticket_resolved', '1') === '1') {
             $statusLabel = getStatusLabel($status);
             $notifTitle  = 'Stato ticket ' . $prefix . ' → ' . $statusLabel;
             $notified    = [$user['id']];
