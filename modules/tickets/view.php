@@ -363,13 +363,27 @@ include APP_ROOT . '/includes/header.php';
                 </form>
             </div>
         </div>
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm mb-3">
             <div class="card-header bg-white"><h6 class="mb-0">Azioni</h6></div>
             <div class="card-body d-grid gap-2">
                 <a href="<?= APP_URL ?>/modules/spare_parts/request.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-tools me-1"></i>Richiedi Parte</a>
                 <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica Ticket</a>
             </div>
         </div>
+        <?php if (isAdmin()): ?>
+        <div class="card shadow-sm border-danger">
+            <div class="card-header bg-white"><h6 class="mb-0 text-danger">Zona Pericolosa</h6></div>
+            <div class="card-body">
+                <form method="post" action="<?= APP_URL ?>/modules/tickets/index.php"
+                    onsubmit="return confirm('Eliminare definitivamente il ticket <?= h(getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT)) ?>? L\'operazione non è reversibile.')">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="delete_ticket">
+                    <input type="hidden" name="ticket_id" value="<?= $id ?>">
+                    <button type="submit" class="btn btn-danger btn-sm w-100"><i class="bi bi-trash me-1"></i>Elimina Ticket</button>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>

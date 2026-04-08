@@ -14,6 +14,25 @@ define('BREADCRUMB', ['Dashboard' => APP_URL . '/dashboard.php', 'Ticket' => '']
 $db = getDB();
 $user = currentUser();
 
+// Handle delete (admin only)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_ticket' && isAdmin()) {
+    if (validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        $delId = (int)($_POST['ticket_id'] ?? 0);
+        if ($delId) {
+            $db->prepare("DELETE FROM ticket_comments WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("DELETE FROM ticket_attachments WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("DELETE FROM ticket_uscite WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("UPDATE spare_parts_requests SET ticket_id=NULL WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("UPDATE rapportini SET ticket_id=NULL WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("UPDATE periferiche_guaste SET ticket_id=NULL WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("DELETE FROM tickets WHERE id=?")->execute([$delId]);
+            logActivity($user['id'], 'delete', 'ticket', $delId, "Eliminato ticket $delId");
+        }
+    }
+    header('Location: ' . APP_URL . '/modules/tickets/index.php?deleted=1');
+    exit;
+}
+
 $perPage = (int)getSetting('items_per_page', '25');
 $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $perPage;
@@ -57,6 +76,10 @@ include APP_ROOT . '/includes/header.php';
     <h4 class="mb-0"><i class="bi bi-ticket-detailed me-2 text-primary"></i>Gestione Ticket</h4>
     <a href="<?= APP_URL ?>/modules/tickets/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuovo Ticket</a>
 </div>
+
+<?php if (isset($_GET['deleted'])): ?>
+<div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle me-2"></i>Ticket eliminato con successo. <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+<?php endif; ?>
 
 <!-- Filters -->
 <div class="card border-0 shadow-sm mb-4">
@@ -161,6 +184,17 @@ include APP_ROOT . '/includes/header.php';
                                 <a href="<?= APP_URL ?>/modules/tickets/view.php?id=<?= $t['id'] ?>" class="btn btn-outline-primary" title="Visualizza"><i class="bi bi-eye"></i></a>
                                 <?php if (isTechnician()): ?>
                                 <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $t['id'] ?>" class="btn btn-outline-secondary" title="Modifica"><i class="bi bi-pencil"></i></a>
+                                <?php endif; ?>
+                                <?php if (isAdmin()): ?>
+                                <button type="button" class="btn btn-outline-danger" title="Elimina"
+                                    onclick="if(confirm('Eliminare il ticket <?= h(getTicketPrefix() . '-' . str_pad($t['id'], 4, '0', STR_PAD_LEFT)) ?> definitivamente?')){document.getElementById('delform<?= $t['id'] ?>').submit()}">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                <form id="delform<?= $t['id'] ?>" method="post" style="display:none">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="action" value="delete_ticket">
+                                    <input type="hidden" name="ticket_id" value="<?= $t['id'] ?>">
+                                </form>
                                 <?php endif; ?>
                             </div>
                         </td>

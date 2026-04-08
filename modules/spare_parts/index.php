@@ -46,6 +46,16 @@ include APP_ROOT . '/includes/header.php';
     <?php endif; ?>
 </div>
 
+<?php if (isset($_GET['created'])): ?>
+<div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle me-2"></i>Parte creata con successo. <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+<?php endif; ?>
+<?php if (isset($_GET['updated'])): ?>
+<div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle me-2"></i>Parte aggiornata con successo. <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+<?php endif; ?>
+<?php if (isset($_GET['deleted'])): ?>
+<div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle me-2"></i>Parte eliminata con successo. <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+<?php endif; ?>
+
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-2">
@@ -110,6 +120,7 @@ include APP_ROOT . '/includes/header.php';
                         <td class="small"><?= $p['unit_price'] ? '€ ' . number_format($p['unit_price'], 2, ',', '.') : '-' ?></td>
                         <td>
                             <div class="btn-group btn-group-sm">
+                                <a href="<?= APP_URL ?>/modules/spare_parts/view.php?id=<?= $p['id'] ?>" class="btn btn-outline-primary" title="Visualizza"><i class="bi bi-eye"></i></a>
                                 <?php if (isTechnician()): ?>
                                 <a href="<?= APP_URL ?>/modules/spare_parts/request.php?part_id=<?= $p['id'] ?>" class="btn btn-outline-success" title="Richiedi"><i class="bi bi-cart-plus"></i></a>
                                 <a href="<?= APP_URL ?>/modules/spare_parts/edit.php?id=<?= $p['id'] ?>" class="btn btn-outline-secondary" title="Modifica"><i class="bi bi-pencil"></i></a>
