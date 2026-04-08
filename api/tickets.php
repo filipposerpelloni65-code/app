@@ -34,6 +34,7 @@ switch ($action) {
 
     case 'update_status':
         if (!isTechnician()) { http_response_code(403); echo json_encode(['success'=>false,'error'=>'Forbidden']); break; }
+        if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { http_response_code(403); echo json_encode(['success'=>false,'error'=>'CSRF token non valido']); break; }
         $id = (int)($_POST['id'] ?? 0);
         $status = $_POST['status'] ?? '';
         if (!in_array($status, ['open','in_progress','waiting','resolved','closed'])) {

@@ -179,3 +179,57 @@ $(document).ready(function () {
 
 // App URL global (set in PHP pages)
 window.appUrl = window.appUrl || '';
+
+// Global search
+$(document).ready(function () {
+    var searchInput = $('#globalSearchInput');
+    var searchResults = $('#globalSearchResults');
+    var searchTimer = null;
+
+    if (!searchInput.length) return;
+
+    searchInput.on('input', function () {
+        clearTimeout(searchTimer);
+        var q = $(this).val().trim();
+        if (q.length < 2) {
+            searchResults.hide().empty();
+            return;
+        }
+        searchTimer = setTimeout(function () {
+            $.get(window.appUrl + '/api/search.php', { q: q }, function (data) {
+                searchResults.empty();
+                if (!data.results || !data.results.length) {
+                    searchResults.append('<div class="p-2 text-muted small">Nessun risultato per "' + $('<div>').text(q).html() + '"</div>');
+                } else {
+                    data.results.forEach(function (r) {
+                        var item = $('<a>')
+                            .attr('href', r.url)
+                            .addClass('d-flex align-items-center gap-2 px-3 py-2 text-decoration-none text-dark border-bottom search-result-item')
+                            .html('<i class="bi ' + r.icon + ' text-primary flex-shrink-0"></i>' +
+                                  '<span class="small text-truncate flex-grow-1">' + $('<div>').text(r.label).html() + '</span>' +
+                                  (r.badge ? '<span class="badge bg-secondary ms-1 flex-shrink-0" style="font-size:0.7rem">' + $('<div>').text(r.badge).html() + '</span>' : ''));
+                        searchResults.append(item);
+                    });
+                }
+                searchResults.show();
+            }, 'json').fail(function () {
+                searchResults.hide();
+            });
+        }, 300);
+    });
+
+    // Hide results when clicking outside
+    $(document).on('click', function (e) {
+        if (!$(e.target).closest('#globalSearchInput, #globalSearchResults').length) {
+            searchResults.hide();
+        }
+    });
+
+    // Close on ESC
+    searchInput.on('keydown', function (e) {
+        if (e.key === 'Escape') {
+            searchResults.hide();
+            $(this).val('');
+        }
+    });
+});

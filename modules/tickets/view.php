@@ -185,7 +185,12 @@ include APP_ROOT . '/includes/header.php';
                     <strong><?= h($ticket['title']) ?></strong>
                 </div>
                 <?php if (isTechnician()): ?>
+                <div class="d-flex gap-2">
                 <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica</a>
+                <?php if (isModuleEnabled('spedizioni')): ?>
+                <a href="<?= APP_URL ?>/modules/spedizioni/create.php?ticket_id=<?= $id ?>" class="btn btn-sm btn-outline-primary" title="Crea Spedizione"><i class="bi bi-truck me-1"></i>Spedizione</a>
+                <?php endif; ?>
+                </div>
                 <?php endif; ?>
             </div>
             <div class="card-body">
