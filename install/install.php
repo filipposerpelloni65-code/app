@@ -81,6 +81,19 @@ try {
         FOREIGN KEY (created_by) REFERENCES users(id)
     )");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ticket_custom_fields (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        field_label VARCHAR(255) NOT NULL,
+        field_name  VARCHAR(100) NOT NULL UNIQUE,
+        field_type  ENUM('text','number','date','select','checkbox','textarea') NOT NULL DEFAULT 'text',
+        field_options TEXT NULL COMMENT 'JSON array for select options',
+        is_required TINYINT(1) NOT NULL DEFAULT 0,
+        sort_order  INT NOT NULL DEFAULT 0,
+        active      TINYINT(1) NOT NULL DEFAULT 1,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )");
+
     $pdo->exec("INSERT IGNORE INTO modules (name, slug, description, version, enabled, icon, sort_order) VALUES
         ('Gestione Ticket','tickets','Sistema di gestione ticket','1.0.0',1,'bi-ticket-detailed',1),
         ('Parti di Ricambio','spare_parts','Gestione magazzino parti di ricambio','1.0.0',1,'bi-tools',2),
