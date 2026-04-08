@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dataSped     = trim($_POST['data_spedizione'] ?? '') ?: null;
     $dataConsegna = trim($_POST['data_consegna_prevista'] ?? '') ?: null;
 
-    if (!in_array($status, ['da_spedire','spedita','consegnata','annullata'])) { $errors[] = 'Stato non valido.'; }
+    if (!in_array($status, ['bozza','da_spedire','spedita','consegnata','annullata'])) { $errors[] = 'Stato non valido.'; }
 
     if (!$errors) {
         $db->prepare("UPDATE spedizioni SET tracking_number=?, corriere=?, status=?, ticket_id=?, spare_parts_request_id=?, dealer_id=?, location_id=?, note=?, data_spedizione=?, data_consegna_prevista=?, updated_at=NOW() WHERE id=?")
@@ -109,6 +109,7 @@ include APP_ROOT . '/includes/header.php';
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Stato <span class="text-danger">*</span></label>
                     <select name="status" class="form-select" required>
+                        <option value="bozza" <?= ($s['status'] ?? '') === 'bozza' ? 'selected' : '' ?>>Bozza</option>
                         <option value="da_spedire" <?= ($s['status'] ?? '') === 'da_spedire' ? 'selected' : '' ?>>Da Spedire</option>
                         <option value="spedita" <?= ($s['status'] ?? '') === 'spedita' ? 'selected' : '' ?>>Spedita</option>
                         <option value="consegnata" <?= ($s['status'] ?? '') === 'consegnata' ? 'selected' : '' ?>>Consegnata</option>
