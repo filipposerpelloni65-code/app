@@ -57,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$consigneeName || !$consigneeAddress || !$consigneeZip || !$consigneeCity) {
             $errors[] = 'Compila i campi BRT: Ragione Sociale, Indirizzo, CAP e Città del destinatario.';
         } else {
+            // BRT API field length constraints: companyName≤70, address≤35, zip≤9, city≤35, province≤2
             $brtData = [
                 'consigneeCompanyName'                  => mb_substr($consigneeName, 0, 70),
                 'consigneeAddress'                      => mb_substr($consigneeAddress, 0, 35),

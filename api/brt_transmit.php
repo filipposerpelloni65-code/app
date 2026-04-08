@@ -74,6 +74,7 @@ foreach ($speds as $s) {
         $pesoKg   = max(0.1, (float)($s['peso_kg'] ?? 1.0));
         $note     = mb_substr((string)($s['note'] ?? ''), 0, 70);
 
+        // BRT numericSenderReference must be a positive integer ≤ 9999999 (7 digits max per BRT API spec)
         $numericRef = (int)(microtime(true) * 1000) % 9999999;
 
         $createData = array_merge($consigneeData, [

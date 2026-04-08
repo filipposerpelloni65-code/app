@@ -42,6 +42,10 @@ $bozzaStmt = $db->query("
 ");
 $bozzaList = $bozzaStmt->fetchAll();
 
+// Count bozza-only for badge (from loaded list, which is already filtered)
+$bozzaCount = 0;
+foreach ($bozzaList as $_bs) { if ($_bs['status'] === 'bozza') { $bozzaCount++; } }
+
 // ── Tab: archivio borderi ─────────────────────────────────────────────────
 $borderiStmt = $db->query("
     SELECT b.*, u.full_name AS creator_name
@@ -72,7 +76,6 @@ include APP_ROOT . '/includes/header.php';
     <li class="nav-item">
         <a class="nav-link <?= $activeTab === 'da_trasmettere' ? 'active' : '' ?>" href="?tab=da_trasmettere">
             <i class="bi bi-send me-1"></i>Da Trasmettere
-            <?php $bozzaCount = count(array_filter($bozzaList, fn($r) => $r['status'] === 'bozza')); ?>
             <?php if ($bozzaCount): ?><span class="badge bg-warning text-dark ms-1"><?= $bozzaCount ?></span><?php endif; ?>
         </a>
     </li>

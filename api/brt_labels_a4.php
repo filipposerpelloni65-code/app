@@ -147,7 +147,7 @@ if (!$labelData) {
         overflow: hidden;
         position: relative;
         width: 99mm;
-        height: 70.5mm; /* (297 - 10 - 9) / 4 ≈ 69.5mm */
+        height: 70.5mm; /* (297mm - 10mm padding - 4×3mm gaps) / 4 rows ≈ 70.5mm */
     }
 
     .label-cell iframe,
@@ -202,7 +202,10 @@ if (!$labelData) {
 
 <div class="pages-container">
 <?php
-$labelsPerPage = 8;
+// Number of labels per A4 page (2-column × 4-row grid)
+const LABELS_PER_A4_PAGE = 8;
+
+$labelsPerPage = LABELS_PER_A4_PAGE;
 $chunks = array_chunk($labelData, $labelsPerPage);
 $globalIdx = 1;
 
@@ -220,8 +223,8 @@ foreach ($chunks as $chunk):
     </div>
     <?php $globalIdx++; endforeach; ?>
     <?php
-    // Fill empty cells to complete the grid
-    $empty = $labelsPerPage - count($chunk);
+    // Fill empty cells to complete the 2×4 grid
+    $empty = LABELS_PER_A4_PAGE - count($chunk);
     for ($e = 0; $e < $empty; $e++):
     ?>
     <div class="label-cell" style="border-color:transparent;background:#fafafa;"></div>
