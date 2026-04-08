@@ -18,6 +18,9 @@ $notifCounts = $currentUser ? getNotificationCounts() : [];
     <meta name="csrf-token" content="<?= htmlspecialchars(generateCsrfToken()) ?>">
     <meta name="app-url" content="<?= htmlspecialchars(APP_URL) ?>">
     <title><?= defined('PAGE_TITLE') ? h(PAGE_TITLE) . ' - ' : '' ?><?= h($appName) ?></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/app.css">

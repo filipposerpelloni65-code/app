@@ -59,17 +59,20 @@ $dashTechnicians = isTechnician()
 include APP_ROOT . '/includes/header.php';
 ?>
 
-<script>window.appUrl = <?= json_encode(APP_URL) ?>;</script>
+<script>
+window.appUrl = <?= json_encode(APP_URL) ?>;
+window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
+</script>
 
 <div class="row g-4 mb-4">
     <div class="col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm text-white bg-primary">
+        <div class="card stat-card card-lift bg-primary border-0 shadow-sm text-white">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="fs-2 fw-bold"><?= $stats['open'] ?></div>
-                    <div class="opacity-75">Ticket Aperti</div>
+                    <div class="stat-value" data-target="<?= $stats['open'] ?>"><?= $stats['open'] ?></div>
+                    <div class="stat-label">Ticket Aperti</div>
                 </div>
-                <i class="bi bi-ticket-detailed fs-1 opacity-50"></i>
+                <i class="bi bi-ticket-detailed stat-icon"></i>
             </div>
             <div class="card-footer bg-transparent border-0 pt-0">
                 <a href="<?= APP_URL ?>/modules/tickets/index.php?status=open" class="text-white text-decoration-none small"><i class="bi bi-arrow-right me-1"></i>Visualizza tutti</a>
@@ -77,13 +80,13 @@ include APP_ROOT . '/includes/header.php';
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm text-dark bg-warning">
+        <div class="card stat-card card-lift bg-warning border-0 shadow-sm text-dark">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="fs-2 fw-bold"><?= $stats['in_progress'] ?></div>
-                    <div class="opacity-75">In Lavorazione</div>
+                    <div class="stat-value" data-target="<?= $stats['in_progress'] ?>"><?= $stats['in_progress'] ?></div>
+                    <div class="stat-label">In Lavorazione</div>
                 </div>
-                <i class="bi bi-gear-wide-connected fs-1 opacity-50"></i>
+                <i class="bi bi-gear-wide-connected stat-icon"></i>
             </div>
             <div class="card-footer bg-transparent border-0 pt-0">
                 <a href="<?= APP_URL ?>/modules/tickets/index.php?status=in_progress" class="text-dark text-decoration-none small"><i class="bi bi-arrow-right me-1"></i>Visualizza tutti</a>
@@ -91,13 +94,13 @@ include APP_ROOT . '/includes/header.php';
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm text-white bg-success">
+        <div class="card stat-card card-lift bg-success border-0 shadow-sm text-white">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="fs-2 fw-bold"><?= $stats['resolved_today'] ?></div>
-                    <div class="opacity-75">Risolti Oggi</div>
+                    <div class="stat-value" data-target="<?= $stats['resolved_today'] ?>"><?= $stats['resolved_today'] ?></div>
+                    <div class="stat-label">Risolti Oggi</div>
                 </div>
-                <i class="bi bi-check-circle fs-1 opacity-50"></i>
+                <i class="bi bi-check-circle stat-icon"></i>
             </div>
             <div class="card-footer bg-transparent border-0 pt-0">
                 <a href="<?= APP_URL ?>/modules/tickets/index.php?status=resolved" class="text-white text-decoration-none small"><i class="bi bi-arrow-right me-1"></i>Visualizza tutti</a>
@@ -105,13 +108,13 @@ include APP_ROOT . '/includes/header.php';
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm text-white bg-danger">
+        <div class="card stat-card card-lift bg-danger border-0 shadow-sm text-white">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="fs-2 fw-bold"><?= $stats['low_stock'] ?></div>
-                    <div class="opacity-75">Scorte Basse</div>
+                    <div class="stat-value" data-target="<?= $stats['low_stock'] ?>"><?= $stats['low_stock'] ?></div>
+                    <div class="stat-label">Scorte Basse</div>
                 </div>
-                <i class="bi bi-exclamation-triangle fs-1 opacity-50"></i>
+                <i class="bi bi-exclamation-triangle stat-icon"></i>
             </div>
             <div class="card-footer bg-transparent border-0 pt-0">
                 <a href="<?= APP_URL ?>/modules/spare_parts/index.php?filter=low_stock" class="text-white text-decoration-none small"><i class="bi bi-arrow-right me-1"></i>Visualizza parti</a>

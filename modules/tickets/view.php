@@ -191,6 +191,11 @@ define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Ticket' => APP_U
 include APP_ROOT . '/includes/header.php';
 ?>
 
+<script>
+window.appUrl = <?= json_encode(APP_URL) ?>;
+window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
+</script>
+
 <?php if (isset($_GET['created'])): ?>
 <div class="alert alert-success alert-dismissible fade show" role="alert">
     <i class="bi bi-check-circle me-2"></i>Ticket creato con successo!
