@@ -32,7 +32,7 @@ $_fontSizeVal = $_fontSizeMap[$_themeFontSize] ?? '0.9rem';
 
 // Validate colors (must be hex to avoid XSS)
 function _validHex(string $c, string $fallback): string {
-    return preg_match('/^#[0-9a-fA-F]{3,8}$/', $c) ? $c : $fallback;
+    return preg_match('/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/', $c) ? $c : $fallback;
 }
 $_themePrimary       = _validHex($_themePrimary, '#3b82f6');
 $_themeSidebarTop    = _validHex($_themeSidebarTop, '#0f172a');

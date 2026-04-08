@@ -78,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
             if ($ticket['assigned_to'] && !in_array((int)$ticket['assigned_to'], $notified)) {
                 createNotification((int)$ticket['assigned_to'], 'status', $notifTitle, '', 'ticket', $id, $ticketUrl);
+                $notified[] = (int)$ticket['assigned_to'];
             }
         }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id);

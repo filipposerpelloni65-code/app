@@ -260,7 +260,7 @@ include APP_ROOT . '/includes/header.php';
                 </div>
                 <div class="col-md-5">
                     <label class="form-label">Password SMTP <small class="text-muted">(lascia vuoto per non cambiare)</small></label>
-                    <input type="password" name="smtp_pass" class="form-control" autocomplete="new-password">
+                    <input type="password" name="smtp_pass" class="form-control" autocomplete="off">
                 </div>
             </div>
             <hr>
