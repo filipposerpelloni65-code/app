@@ -216,9 +216,13 @@ include APP_ROOT . '/includes/header.php';
                     <td><?= h($c['name']) ?></td>
                     <td class="small text-muted"><?= h($c['description']??'') ?></td>
                     <td>
-                        <form method="post" class="d-inline" onsubmit="return confirm('Eliminare?')">
+                        <form method="post" class="d-inline">
                             <?= csrfField() ?><input type="hidden" name="section" value="del_cat"><input type="hidden" name="cat_id" value="<?= $c['id'] ?>">
-                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            <button type="submit"
+                                class="btn btn-sm btn-outline-danger"
+                                data-confirm="Eliminare questa categoria?"
+                                data-confirm-class="btn-danger"
+                                data-confirm-text="Elimina"><i class="bi bi-trash"></i></button>
                         </form>
                     </td>
                 </tr>

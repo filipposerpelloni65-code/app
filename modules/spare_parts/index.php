@@ -122,7 +122,12 @@ include APP_ROOT . '/includes/header.php';
                             <div class="btn-group btn-group-sm">
                                 <a href="<?= APP_URL ?>/modules/spare_parts/view.php?id=<?= $p['id'] ?>" class="btn btn-outline-primary" title="Visualizza"><i class="bi bi-eye"></i></a>
                                 <?php if (isTechnician()): ?>
-                                <a href="<?= APP_URL ?>/modules/spare_parts/request.php?part_id=<?= $p['id'] ?>" class="btn btn-outline-success" title="Richiedi"><i class="bi bi-cart-plus"></i></a>
+                                <button type="button"
+                                    class="btn btn-outline-success part-request-modal-btn"
+                                    data-part-id="<?= $p['id'] ?>"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#partRequestModal"
+                                    title="Richiedi"><i class="bi bi-cart-plus"></i></button>
                                 <a href="<?= APP_URL ?>/modules/spare_parts/edit.php?id=<?= $p['id'] ?>" class="btn btn-outline-secondary" title="Modifica"><i class="bi bi-pencil"></i></a>
                                 <?php endif; ?>
                             </div>
@@ -147,5 +152,72 @@ include APP_ROOT . '/includes/header.php';
     </div>
     <?php endif; ?>
 </div>
+
+<?php if (isTechnician()): ?>
+<?php
+$modalParts   = getModalSpareParts();
+$modalTickets = getModalOpenTickets();
+?>
+<!-- ============================================================
+     Parts Request Modal
+     ============================================================ -->
+<div class="modal fade" id="partRequestModal" tabindex="-1" aria-labelledby="partRequestModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-semibold" id="partRequestModalLabel">
+                    <i class="bi bi-cart-plus text-success me-2"></i>Richiedi Parte di Ricambio
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <form method="post" action="<?= APP_URL ?>/modules/spare_parts/request.php">
+                <?= csrfField() ?>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Parte <span class="text-danger">*</span></label>
+                        <select name="part_id" class="form-select" id="modalPartSelect" required>
+                            <option value="">-- Seleziona parte --</option>
+                            <?php foreach ($modalParts as $mp): ?>
+                            <option value="<?= $mp['id'] ?>">
+                                <?= h($mp['name']) ?> (<?= h($mp['sku']) ?>) — <?= (int)$mp['quantity'] ?> disponibili
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Quantità</label>
+                        <input type="number" name="quantity" id="modalPartQty" class="form-control" value="1" min="1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Ticket associato</label>
+                        <select name="ticket_id" class="form-select">
+                            <option value="">-- Nessun ticket --</option>
+                            <?php foreach ($modalTickets as $mt): ?>
+                            <option value="<?= $mt['id'] ?>">
+                                <?= h(getTicketPrefix() . '-' . str_pad($mt['id'], 4, '0', STR_PAD_LEFT) . ' — ' . $mt['title']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold">Note</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Note aggiuntive..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Annulla
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-send me-1"></i>Invia Richiesta
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<script>window.appUrl = <?= json_encode(APP_URL) ?>;</script>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>

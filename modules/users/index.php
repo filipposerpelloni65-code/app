@@ -98,7 +98,12 @@ include APP_ROOT . '/includes/header.php';
                             <form method="post" class="d-inline">
                                 <?= csrfField() ?>
                                 <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                                <button type="submit" name="toggle_user" value="1" class="btn btn-outline-<?= $u['active']?'warning':'success' ?>" title="<?= $u['active']?'Disabilita':'Abilita' ?>"><i class="bi bi-<?= $u['active']?'person-dash':'person-check' ?>"></i></button>
+                                <button type="submit" name="toggle_user" value="1"
+                                    class="btn btn-outline-<?= $u['active']?'warning':'success' ?>"
+                                    data-confirm="<?= $u['active'] ? 'Disabilitare l\'utente ' . h($u['full_name']) . '?' : 'Abilitare l\'utente ' . h($u['full_name']) . '?' ?>"
+                                    data-confirm-class="<?= $u['active'] ? 'btn-warning' : 'btn-success' ?>"
+                                    data-confirm-text="<?= $u['active'] ? 'Disabilita' : 'Abilita' ?>"
+                                    title="<?= $u['active']?'Disabilita':'Abilita' ?>"><i class="bi bi-<?= $u['active']?'person-dash':'person-check' ?>"></i></button>
                             </form>
                             <?php endif; ?>
                         </div>

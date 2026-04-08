@@ -229,21 +229,21 @@ include APP_ROOT . '/includes/header.php';
                                 <a href="<?= APP_URL ?>/modules/tickets/view.php?id=<?= $t['id'] ?>" class="btn btn-outline-primary" title="Visualizza"><i class="bi bi-eye"></i></a>
                                 <?php if (isTechnician()): ?>
                                 <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $t['id'] ?>" class="btn btn-outline-secondary" title="Modifica"><i class="bi bi-pencil"></i></a>
-                                <div class="dropdown d-inline-block">
-                                    <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Cambia stato" style="border-radius:0 8px 8px 0"><i class="bi bi-arrow-repeat"></i></button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><h6 class="dropdown-header">Cambia Stato</h6></li>
-                                        <?php foreach (['open'=>'Aperto','in_progress'=>'In Lavorazione','waiting'=>'In Attesa','resolved'=>'Risolto','closed'=>'Chiuso'] as $sv=>$sl): ?>
-                                        <?php if ($sv !== $t['status']): ?>
-                                        <li><a class="dropdown-item quick-status-change" href="#" data-ticket-id="<?= $t['id'] ?>" data-status="<?= $sv ?>"><?= $sl ?></a></li>
-                                        <?php endif; ?>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                </div>
+                                <?php if (!in_array($t['status'], ['closed'])): ?>
+                                <button type="button" class="btn btn-outline-info ticket-quick-status"
+                                    data-ticket-id="<?= $t['id'] ?>"
+                                    data-current-status="<?= h($t['status']) ?>"
+                                    title="Cambia Stato Rapido"
+                                    data-bs-toggle="tooltip"><i class="bi bi-arrow-repeat"></i></button>
+                                <?php endif; ?>
                                 <?php endif; ?>
                                 <?php if (isAdmin()): ?>
-                                <button type="button" class="btn btn-outline-danger" title="Elimina"
-                                    onclick="if(confirm('Eliminare il ticket <?= h(getTicketPrefix() . '-' . str_pad($t['id'], 4, '0', STR_PAD_LEFT)) ?> definitivamente?')){document.getElementById('delform<?= $t['id'] ?>').submit()}">
+                                <button type="button" class="btn btn-outline-danger"
+                                    data-confirm="Eliminare il ticket <?= h(getTicketPrefix() . '-' . str_pad($t['id'], 4, '0', STR_PAD_LEFT)) ?> definitivamente?"
+                                    data-confirm-class="btn-danger"
+                                    data-confirm-text="Elimina"
+                                    title="Elimina"
+                                    onclick="document.getElementById('delform<?= $t['id'] ?>').submit()">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 <form id="delform<?= $t['id'] ?>" method="post" style="display:none">
@@ -278,6 +278,52 @@ include APP_ROOT . '/includes/header.php';
     </div>
     <?php endif; ?>
 </div>
+
+<?php if (isTechnician()): ?>
+<!-- ============================================================
+     Quick Status Change Modal
+     ============================================================ -->
+<div class="modal fade" id="ticketStatusModal" tabindex="-1" aria-labelledby="ticketStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-semibold" id="ticketStatusModalLabel">
+                    <i class="bi bi-arrow-repeat text-info me-2"></i>Cambia Stato Ticket
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <form id="quickStatusForm" method="post" action="">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="change_status">
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Ticket: <strong id="statusModalTicketCode"></strong></p>
+                    <label class="form-label fw-semibold">Nuovo Stato</label>
+                    <select name="new_status" class="form-select" id="statusModalSelect">
+                        <option value="open">Aperto</option>
+                        <option value="in_progress">In Lavorazione</option>
+                        <option value="waiting">In Attesa</option>
+                        <option value="resolved">Risolto</option>
+                        <option value="closed">Chiuso</option>
+                    </select>
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Annulla
+                    </button>
+                    <button type="submit" class="btn btn-info text-white">
+                        <i class="bi bi-check-lg me-1"></i>Aggiorna Stato
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<script>
+window.appUrl = <?= json_encode(APP_URL) ?>;
+window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
+</script>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
 <!-- Quick status change hidden form -->
