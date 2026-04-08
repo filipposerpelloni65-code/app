@@ -743,6 +743,29 @@ body.sidebar-collapsed .sidebar .user-avatar {
     animation: pulse 1.5s ease infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .priority-option[value="urgent"]:checked + label {
+        animation: none;
+    }
+    .animate-fade-in,
+    .animate-slide-down,
+    .animate-scale-in,
+    .page-enter,
+    .stagger-item.visible {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+    .login-wrapper::before,
+    .login-wrapper::after,
+    .stat-card::before {
+        animation: none;
+    }
+    .card, .btn, .sidebar .nav-link, .table-hover tbody tr {
+        transition: none !important;
+    }
+}
+
 /* Form section card in ticket create */
 .form-section {
     background: white;

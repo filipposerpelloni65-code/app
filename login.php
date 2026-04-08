@@ -62,7 +62,7 @@ body { font-family: 'Montserrat', sans-serif; background: #0f172a; }
     border-radius: 50%;
     background: radial-gradient(circle, rgba(59,130,246,.12) 0%, transparent 65%);
     top: -200px; right: -200px;
-    animation: pulse 7s ease infinite;
+    animation: loginPulse 7s ease infinite;
 }
 .login-bg::after {
     content: '';
@@ -71,11 +71,16 @@ body { font-family: 'Montserrat', sans-serif; background: #0f172a; }
     border-radius: 50%;
     background: radial-gradient(circle, rgba(99,102,241,.1) 0%, transparent 65%);
     bottom: -150px; left: -150px;
-    animation: pulse 9s ease infinite reverse;
+    animation: loginPulse 9s ease infinite reverse;
 }
-@keyframes pulse {
+@keyframes loginPulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .login-bg::before, .login-bg::after { animation: none; }
+    .login-card { animation: none !important; opacity: 1; transform: none; }
+    .btn-login { transition: none; }
 }
 @keyframes scaleIn {
     from { opacity: 0; transform: scale(0.93) translateY(20px); }
