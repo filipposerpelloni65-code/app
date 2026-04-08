@@ -48,16 +48,16 @@ class BrtApi
                 'consigneeCountryAbbreviationISOAlpha2' => 'IT',
                 'numberOfParcels'                      => 1,
                 'weightKG'                             => 1.0,
-                'isCODMandatory'                       => 'N',
+                'isCODMandatory'                       => '0',
             ], $data),
         ];
 
         if ($withLabel) {
-            $body['isLabelRequired'] = 'Y';
+            $body['isLabelRequired'] = '1';
             $body['labelParameters'] = [
                 'outputType'    => 'PDF',
                 'labelFormat'   => 'A6',
-                'isLogoRequired'=> 'Y',
+                'isLogoRequired'=> '1',
             ];
         }
 
