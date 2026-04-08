@@ -45,6 +45,14 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => $rows]);
         break;
 
+    case 'dealer_locations':
+        $dealerId = (int)($_GET['dealer_id'] ?? 0);
+        if (!$dealerId) { echo json_encode(['success'=>false,'error'=>'Missing dealer_id']); break; }
+        $rows = $db->prepare("SELECT id, name FROM dealer_locations WHERE dealer_id=? AND active=1 ORDER BY name");
+        $rows->execute([$dealerId]);
+        echo json_encode(['success' => true, 'data' => $rows->fetchAll()]);
+        break;
+
     default:
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Unknown action']);

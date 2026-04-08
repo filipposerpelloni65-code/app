@@ -35,6 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
 
     if (!$errors) {
+        // Auto-assign if enabled and no assignee selected
+        if (!$assigned_to && getSetting('auto_assign', '0') === '1') {
+            $assigned_to = getAutoAssignee();
+        }
         $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, status) VALUES (?,?,?,?,?,?,?,?,?,'open')");
         $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario]);
         $newId = $db->lastInsertId();
