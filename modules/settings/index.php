@@ -1300,8 +1300,6 @@ include APP_ROOT . '/includes/header.php';
         apiPost('edit_custom_field', data, function(r) {
             var row = document.getElementById('cf-row-' + r.field.id);
             if (row) {
-                var newRow = document.createElement('tr');
-                newRow.outerHTML; // placeholder
                 var tmp = document.createElement('tbody');
                 tmp.innerHTML = renderCfRow(r.field);
                 row.replaceWith(tmp.firstElementChild);

@@ -129,11 +129,14 @@ switch ($action) {
         // Auto-generate field_name from label
         $fieldName = preg_replace('/[^a-z0-9_]/', '_', strtolower($label));
         $fieldName = preg_replace('/_+/', '_', trim($fieldName, '_'));
-        // Ensure uniqueness
+        // Ensure uniqueness using a prepared statement
         $base = $fieldName;
         $i = 1;
-        while ($db->prepare("SELECT id FROM ticket_custom_fields WHERE field_name=?")->execute([$fieldName]) && $db->query("SELECT COUNT(*) FROM ticket_custom_fields WHERE field_name='$fieldName'")->fetchColumn() > 0) {
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM ticket_custom_fields WHERE field_name=?");
+        $checkStmt->execute([$fieldName]);
+        while ((int)$checkStmt->fetchColumn() > 0) {
             $fieldName = $base . '_' . $i++;
+            $checkStmt->execute([$fieldName]);
         }
         $optionsJson = ($type === 'select' && $options) ? json_encode(array_filter(array_map('trim', explode("\n", $options)))) : null;
         $db->prepare("INSERT INTO ticket_custom_fields (field_label, field_name, field_type, field_options, is_required, sort_order) VALUES (?,?,?,?,?,?)")
