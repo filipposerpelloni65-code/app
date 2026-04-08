@@ -48,6 +48,7 @@ class BrtApi
                 'consigneeCountryAbbreviationISOAlpha2' => 'IT',
                 'numberOfParcels'                      => 1,
                 'weightKG'                             => 1.0,
+                'isCODMandatory'                       => 'N',
             ], $data),
         ];
 
@@ -108,7 +109,8 @@ class BrtApi
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => $this->timeout,
-            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYPEER => false,  // BRT uses a self-signed cert in the chain
+            CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_HTTPHEADER     => $headers,
         ]);
 
@@ -132,7 +134,11 @@ class BrtApi
 
         $decoded = json_decode($raw, true);
 
-        // Check BRT executionMessage for errors
+        if ($decoded === null && $raw !== '') {
+            return ['success' => false, 'data' => null, 'error' => "HTTP $httpCode — risposta non JSON: " . mb_substr($raw, 0, 500)];
+        }
+
+        // Check BRT executionMessage for errors (may be array or object)
         $execMsg = $decoded['createResponse']['executionMessage']
             ?? $decoded['confirmResponse']['executionMessage']
             ?? $decoded['deleteResponse']['executionMessage']
@@ -140,13 +146,28 @@ class BrtApi
             ?? $decoded['executionMessage']
             ?? null;
 
+        // BRT may return an array of executionMessage entries; normalise to first non-zero
+        if (is_array($execMsg) && isset($execMsg[0])) {
+            foreach ($execMsg as $em) {
+                if (isset($em['code']) && (int)$em['code'] !== 0) {
+                    $execMsg = $em;
+                    break;
+                }
+            }
+        }
+
         if ($execMsg && isset($execMsg['code']) && (int)$execMsg['code'] !== 0) {
-            $msg = $execMsg['message'] ?? 'Errore BRT';
+            $msg = $execMsg['message'] ?? ($execMsg['description'] ?? 'Errore BRT');
+            $detail = $execMsg['errorList'] ?? $execMsg['details'] ?? null;
+            if ($detail) {
+                $msg .= ' — ' . (is_array($detail) ? implode('; ', array_column($detail, 'message') ?: $detail) : $detail);
+            }
             return ['success' => false, 'data' => $decoded, 'error' => "BRT [{$execMsg['code']}]: $msg"];
         }
 
         if ($httpCode >= 400) {
-            return ['success' => false, 'data' => $decoded, 'error' => "HTTP $httpCode"];
+            $errBody = $raw ? mb_substr($raw, 0, 300) : '';
+            return ['success' => false, 'data' => $decoded, 'error' => "HTTP $httpCode" . ($errBody ? " — $errBody" : '')];
         }
 
         return ['success' => true, 'data' => $decoded, 'error' => null];

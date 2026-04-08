@@ -84,7 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $brt->createShipment($createData, true);
 
             if (!$result['success']) {
-                $errors[] = 'BRT: ' . ($result['error'] ?? 'Errore sconosciuto');
+                $errMsg = 'BRT: ' . ($result['error'] ?? 'Errore sconosciuto');
+                // Append raw BRT response for admin debugging
+                if (!empty($result['data'])) {
+                    $errMsg .= ' [Risposta: ' . json_encode($result['data'], JSON_UNESCAPED_UNICODE) . ']';
+                }
+                $errors[] = $errMsg;
             } else {
                 $cr = $result['data']['createResponse'] ?? [];
                 $brtParcelId = $cr['labels']['label'][0]['parcelID'] ?? null;
