@@ -41,9 +41,16 @@ function getSetting(string $key, string $default = ''): string {
     }
 }
 
-function formatDate(string $date, string $format = 'd/m/Y H:i'): string {
+function formatDate(string $date, string $format = ''): string {
     if (!$date) return '-';
+    if ($format === '') {
+        $format = getSetting('date_format', 'd/m/Y H:i');
+    }
     return date($format, strtotime($date));
+}
+
+function getCurrencySymbol(): string {
+    return getSetting('currency_symbol', '€');
 }
 
 function getStatusBadge(string $status): string {
