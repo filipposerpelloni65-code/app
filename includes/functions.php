@@ -167,39 +167,54 @@ function getSpedizioneStatusLabel(string $status): string {
 }
 
 function getNotificationCounts(): array {
-    $counts = [
-        'open_tickets'      => 0,
-        'pending_requests'  => 0,
-        'periferiche_active'=> 0,
-        'total'             => 0,
-    ];
     try {
         $db = getDB();
-        $user = currentUser();
-        if (!$user) return $counts;
-
-        if (isTechnician()) {
-            $counts['open_tickets']      = (int)$db->query("SELECT COUNT(*) FROM tickets WHERE status IN ('open','in_progress')")->fetchColumn();
-            $counts['pending_requests']  = (int)$db->query("SELECT COUNT(*) FROM spare_parts_requests WHERE status='pending'")->fetchColumn();
-            $counts['periferiche_active']= (int)$db->query("SELECT COUNT(*) FROM periferiche_guaste WHERE stato NOT IN ('restituita','rottamata','non_riparabile')")->fetchColumn();
-        } else {
-            $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE created_by=? AND status IN ('open','in_progress')");
-            $stmt->execute([$user['id']]);
-            $counts['open_tickets'] = (int)$stmt->fetchColumn();
-        }
-        $counts['total'] = $counts['open_tickets'] + $counts['pending_requests'];
+        $counts = [
+            'pending_parts'    => (int)$db->query("SELECT COUNT(*) FROM spare_parts_requests WHERE status='pending'")->fetchColumn(),
+            'open_tickets'     => (int)$db->query("SELECT COUNT(*) FROM tickets WHERE status='open'")->fetchColumn(),
+            'da_spedire'       => (int)$db->query("SELECT COUNT(*) FROM spedizioni WHERE status='da_spedire'")->fetchColumn(),
+            'periferiche_wait' => (int)$db->query("SELECT COUNT(*) FROM periferiche_guaste WHERE stato IN ('in_giacenza','in_diagnosi')")->fetchColumn(),
+        ];
+        return $counts;
     } catch (Exception $e) {
-        // silent
+        return ['pending_parts' => 0, 'open_tickets' => 0, 'da_spedire' => 0, 'periferiche_wait' => 0];
     }
-    return $counts;
 }
 
 function getAutoAssignee(): ?int {
     try {
         $db = getDB();
-        $row = $db->query("SELECT u.id FROM users u LEFT JOIN tickets t ON t.assigned_to=u.id AND t.status IN ('open','in_progress') WHERE u.role IN ('admin','technician') AND u.active=1 GROUP BY u.id ORDER BY COUNT(t.id) ASC LIMIT 1")->fetch();
+        // Round-robin: pick the technician with fewest open tickets
+        $stmt = $db->query("
+            SELECT u.id, COUNT(t.id) AS open_count
+            FROM users u
+            LEFT JOIN tickets t ON t.assigned_to = u.id AND t.status NOT IN ('resolved','closed')
+            WHERE u.role IN ('admin','technician') AND u.active = 1
+            GROUP BY u.id
+            ORDER BY open_count ASC, u.id ASC
+            LIMIT 1
+        ");
+        $row = $stmt->fetch();
         return $row ? (int)$row['id'] : null;
     } catch (Exception $e) {
         return null;
     }
+}
+
+function getComponenteTipoBadge(string $tipo): string {
+    $badges = [
+        'periferica' => '<span class="badge bg-primary">Periferica</span>',
+        'accessorio' => '<span class="badge bg-info text-dark">Accessorio</span>',
+        'cavo'       => '<span class="badge bg-secondary">Cavo</span>',
+    ];
+    return $badges[$tipo] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($tipo) . '</span>';
+}
+
+function getComponenteTipoLabel(string $tipo): string {
+    $labels = [
+        'periferica' => 'Periferica',
+        'accessorio' => 'Accessorio',
+        'cavo'       => 'Cavo',
+    ];
+    return $labels[$tipo] ?? $tipo;
 }
