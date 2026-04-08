@@ -37,6 +37,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Update ticket updated_at
         $db->prepare("UPDATE tickets SET updated_at=NOW() WHERE id=?")->execute([$id]);
         logActivity($user['id'], 'comment', 'ticket', $id, 'Aggiunto commento');
+        // Notifications: notify ticket creator and assigned technician
+        $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $id . '#comments';
+        $prefix = getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
+        $notifTitle = 'Nuovo commento su ' . $prefix;
+        $notifMsg   = strlen($message) > 120 ? substr($message, 0, 120) . '…' : $message;
+        $notified = [$user['id']];
+        if ($ticket['created_by'] && !in_array((int)$ticket['created_by'], $notified)) {
+            createNotification((int)$ticket['created_by'], 'comment', $notifTitle, $notifMsg, 'ticket', $id, $ticketUrl);
+            $notified[] = (int)$ticket['created_by'];
+        }
+        if ($ticket['assigned_to'] && !in_array((int)$ticket['assigned_to'], $notified)) {
+            createNotification((int)$ticket['assigned_to'], 'comment', $notifTitle, $notifMsg, 'ticket', $id, $ticketUrl);
+            $notified[] = (int)$ticket['assigned_to'];
+        }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#comments');
         exit;
     }
@@ -50,6 +64,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $closedAt = in_array($newStatus, ['resolved','closed']) ? ', closed_at=NOW()' : '';
         $db->prepare("UPDATE tickets SET status=?, updated_at=NOW()$closedAt WHERE id=?")->execute([$newStatus, $id]);
         logActivity($user['id'], 'status_change', 'ticket', $id, "Stato cambiato in: $newStatus");
+        // Notifications for status change
+        $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $id;
+        $prefix = getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
+        $statusLabel = getStatusLabel($newStatus);
+        $notifTitle = 'Stato ticket ' . $prefix . ' → ' . $statusLabel;
+        $notified = [$user['id']];
+        if ($ticket['created_by'] && !in_array((int)$ticket['created_by'], $notified)) {
+            createNotification((int)$ticket['created_by'], 'status', $notifTitle, '', 'ticket', $id, $ticketUrl);
+            $notified[] = (int)$ticket['created_by'];
+        }
+        if ($ticket['assigned_to'] && !in_array((int)$ticket['assigned_to'], $notified)) {
+            createNotification((int)$ticket['assigned_to'], 'status', $notifTitle, '', 'ticket', $id, $ticketUrl);
+        }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id);
         exit;
     }

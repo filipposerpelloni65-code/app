@@ -43,6 +43,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario]);
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'create', 'ticket', $newId, "Creato ticket: $title");
+        $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $newId;
+        $prefix = getTicketPrefix() . '-' . str_pad($newId, 4, '0', STR_PAD_LEFT);
+        // Notify admins (excluding the creator if they are admin)
+        notifyAdmins('ticket', 'Nuovo ticket aperto: ' . $prefix, $title, 'ticket', $newId, $ticketUrl, $user['id']);
+        // Notify assigned technician
+        if ($assigned_to && $assigned_to != $user['id']) {
+            createNotification($assigned_to, 'assign', 'Ticket assegnato a te: ' . $prefix, $title, 'ticket', $newId, $ticketUrl);
+        }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $newId . '&created=1');
         exit;
     }

@@ -356,3 +356,84 @@ body.sidebar-collapsed .sidebar .user-avatar {
     position: relative;
     height: 300px;
 }
+
+/* ── Notifications ─────────────────────────────────────────────────────────── */
+
+/* Unread notification item */
+.notification-item.notification-unread {
+    border-left: 4px solid #3b82f6 !important;
+    background-color: #eff6ff;
+}
+
+.notification-item {
+    border-left: 4px solid transparent;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+/* Notification bell button */
+.notif-bell-btn {
+    border-radius: 8px;
+}
+
+/* Dropdown notification items */
+.notif-dropdown-item {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.notif-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.notif-dropdown-item:hover {
+    background-color: #f8fafc;
+}
+
+.notif-dropdown-item.unread {
+    background-color: #eff6ff;
+}
+
+.notif-dropdown-item.unread:hover {
+    background-color: #dbeafe;
+}
+
+.notif-type-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    min-width: 8px;
+    margin-top: 6px;
+}
+
+/* Toast notification */
+.notif-toast {
+    min-width: 300px;
+    max-width: 380px;
+    border-left: 4px solid #3b82f6;
+}
+
+.notif-toast.toast-success { border-left-color: #10b981; }
+.notif-toast.toast-warning { border-left-color: #f59e0b; }
+.notif-toast.toast-danger  { border-left-color: #ef4444; }
+.notif-toast.toast-info    { border-left-color: #3b82f6; }
+.notif-toast.toast-ticket  { border-left-color: #6366f1; }
+.notif-toast.toast-comment { border-left-color: #64748b; }
+.notif-toast.toast-status  { border-left-color: #f59e0b; }
+.notif-toast.toast-assign  { border-left-color: #0ea5e9; }
+
+/* Notification icon colors */
+.notif-dot-info    { background-color: #3b82f6; }
+.notif-dot-success { background-color: #10b981; }
+.notif-dot-warning { background-color: #f59e0b; }
+.notif-dot-danger  { background-color: #ef4444; }
+.notif-dot-ticket  { background-color: #6366f1; }
+.notif-dot-comment { background-color: #64748b; }
+.notif-dot-status  { background-color: #f59e0b; }
+.notif-dot-assign  { background-color: #0ea5e9; }
+.notif-dot-part    { background-color: #64748b; }
+
