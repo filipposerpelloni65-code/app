@@ -15,6 +15,9 @@ $db = getDB();
 $user = currentUser();
 $errors = [];
 
+// Pre-fill ticket_id from query string (e.g. when linked from ticket view)
+$preTicketId = (int)($_GET['ticket_id'] ?? 0);
+
 // Load selects
 $tickets = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT 200")->fetchAll();
 $partRequests = $db->query("SELECT spr.id, sp.name AS part_name, spr.quantity, t.title AS ticket_title FROM spare_parts_requests spr JOIN spare_parts sp ON spr.part_id=sp.id LEFT JOIN tickets t ON spr.ticket_id=t.id WHERE spr.status IN ('approved','pending') ORDER BY spr.id DESC LIMIT 200")->fetchAll();
@@ -94,8 +97,11 @@ include APP_ROOT . '/includes/header.php';
                     <label class="form-label fw-semibold">Ticket Collegato</label>
                     <select name="ticket_id" class="form-select">
                         <option value="">-- Nessuno --</option>
-                        <?php foreach ($tickets as $t): ?>
-                        <option value="<?= $t['id'] ?>" <?= ($_POST['ticket_id'] ?? '') == $t['id'] ? 'selected' : '' ?>><?= h(getTicketPrefix().'-'.str_pad($t['id'],4,'0',STR_PAD_LEFT)) ?> — <?= h($t['title']) ?></option>
+                        <?php
+                        $selTicket = (int)($_POST['ticket_id'] ?? $preTicketId);
+                        foreach ($tickets as $t):
+                        ?>
+                        <option value="<?= $t['id'] ?>" <?= $selTicket == $t['id'] ? 'selected' : '' ?>><?= h(getTicketPrefix().'-'.str_pad($t['id'],4,'0',STR_PAD_LEFT)) ?> — <?= h($t['title']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

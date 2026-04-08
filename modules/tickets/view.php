@@ -185,6 +185,21 @@ $componenti = $componentiStmt->fetchAll();
 // Modelli for add-form
 $modelliDisponibili = $db->query("SELECT id, tipo, nome, marca FROM modelli_componenti WHERE active=1 ORDER BY tipo, nome")->fetchAll();
 
+// Spedizioni collegate al ticket
+$spedizioniTicket = [];
+if (isModuleEnabled('spedizioni')) {
+    $spedStmt = $db->prepare("
+        SELECT s.*, d.name AS dealer_name, sp.name AS part_name
+        FROM spedizioni s
+        LEFT JOIN dealers d ON s.dealer_id = d.id
+        LEFT JOIN spare_parts_requests spr ON s.spare_parts_request_id = spr.id
+        LEFT JOIN spare_parts sp ON spr.part_id = sp.id
+        WHERE s.ticket_id = ?
+        ORDER BY s.created_at DESC
+    ");
+    $spedStmt->execute([$id]);
+    $spedizioniTicket = $spedStmt->fetchAll();
+}
 define('PAGE_TITLE', 'Ticket ' . getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT));
 define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Ticket' => APP_URL.'/modules/tickets/index.php', 'Dettaglio' => '']);
 
@@ -585,6 +600,51 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
                 <a href="<?= APP_URL ?>/modules/tickets/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica Ticket</a>
             </div>
         </div>
+        <?php if (isModuleEnabled('spedizioni')): ?>
+        <!-- Spedizioni collegate -->
+        <div class="card border-0 shadow-sm mb-3" id="sped-card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>Spedizioni
+                <?php if ($spedizioniTicket): ?>
+                <span class="badge bg-secondary ms-1"><?= count($spedizioniTicket) ?></span>
+                <?php endif; ?>
+                </h6>
+                <a href="<?= APP_URL ?>/modules/spedizioni/create.php?ticket_id=<?= $id ?>" class="btn btn-outline-primary btn-sm py-0" title="Nuova spedizione"><i class="bi bi-plus-lg"></i></a>
+            </div>
+            <?php if ($spedizioniTicket): ?>
+            <div class="list-group list-group-flush">
+                <?php foreach ($spedizioniTicket as $sp): ?>
+                <a href="<?= APP_URL ?>/modules/spedizioni/view.php?id=<?= $sp['id'] ?>"
+                   class="list-group-item list-group-item-action py-2">
+                    <div class="d-flex justify-content-between align-items-start gap-1">
+                        <span class="font-monospace small fw-semibold text-dark">
+                            <?= $sp['tracking_number'] ? h($sp['tracking_number']) : '<span class="text-muted fst-italic">N/D</span>' ?>
+                        </span>
+                        <?= getSpedizioneStatusBadge($sp['status']) ?>
+                    </div>
+                    <div class="text-muted" style="font-size:.75rem">
+                        <?= $sp['corriere'] ? h($sp['corriere']) : '' ?>
+                        <?php if ($sp['data_consegna_prevista']): ?>
+                        · <i class="bi bi-calendar-check"></i> <?= date('d/m/Y', strtotime($sp['data_consegna_prevista'])) ?>
+                        <?php endif; ?>
+                        <?php if ($sp['part_name']): ?> · <?= h($sp['part_name']) ?><?php endif; ?>
+                    </div>
+                </a>
+                <?php endforeach; ?>
+            </div>
+            <div class="card-footer bg-white p-1 text-center">
+                <a href="<?= APP_URL ?>/modules/spedizioni/report.php?ticket_status=<?= urlencode($ticket['status']) ?>" class="small text-primary text-decoration-none">
+                    <i class="bi bi-file-earmark-bar-graph me-1"></i>Report spedizioni tecnici
+                </a>
+            </div>
+            <?php else: ?>
+            <div class="card-body text-center text-muted small py-3">
+                <i class="bi bi-truck d-block mb-1 fs-4 opacity-50"></i>Nessuna spedizione collegata.
+                <div class="mt-1"><a href="<?= APP_URL ?>/modules/spedizioni/create.php?ticket_id=<?= $id ?>">Crea la prima spedizione</a></div>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
         <?php if (isAdmin()): ?>
         <div class="card shadow-sm border-danger">
             <div class="card-header bg-white"><h6 class="mb-0 text-danger">Zona Pericolosa</h6></div>

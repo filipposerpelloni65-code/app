@@ -57,9 +57,14 @@ include APP_ROOT . '/includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>Gestione Spedizioni</h4>
-    <?php if (isTechnician()): ?>
-    <a href="<?= APP_URL ?>/modules/spedizioni/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuova Spedizione</a>
-    <?php endif; ?>
+    <div class="d-flex gap-2">
+        <a href="<?= APP_URL ?>/modules/spedizioni/report.php" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-file-earmark-bar-graph me-1"></i>Report Tecnici
+        </a>
+        <?php if (isTechnician()): ?>
+        <a href="<?= APP_URL ?>/modules/spedizioni/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuova Spedizione</a>
+        <?php endif; ?>
+    </div>
 </div>
 
 <!-- Filters -->
