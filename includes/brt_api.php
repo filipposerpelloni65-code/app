@@ -48,6 +48,7 @@ class BrtApi
                 'consigneeCountryAbbreviationISOAlpha2' => 'IT',
                 'numberOfParcels'                      => 1,
                 'weightKG'                             => 1.0,
+                'isCODMandatory'                       => 'N',
             ], $data),
         ];
 
