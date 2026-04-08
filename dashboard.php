@@ -18,6 +18,16 @@ $stats['open'] = $db->query("SELECT COUNT(*) FROM tickets WHERE status='open'")-
 $stats['in_progress'] = $db->query("SELECT COUNT(*) FROM tickets WHERE status='in_progress'")->fetchColumn();
 $stats['resolved_today'] = $db->query("SELECT COUNT(*) FROM tickets WHERE status='resolved' AND DATE(closed_at)=CURDATE()")->fetchColumn();
 $stats['low_stock'] = $db->query("SELECT COUNT(*) FROM spare_parts WHERE quantity <= min_quantity")->fetchColumn();
+// Additional stats
+try {
+    $stats['periferiche_attive'] = $db->query("SELECT COUNT(*) FROM periferiche_guaste WHERE stato NOT IN ('restituita','rottamata')")->fetchColumn();
+} catch (Exception $e) { $stats['periferiche_attive'] = 0; }
+try {
+    $stats['da_spedire'] = $db->query("SELECT COUNT(*) FROM spedizioni WHERE status='da_spedire'")->fetchColumn();
+} catch (Exception $e) { $stats['da_spedire'] = 0; }
+try {
+    $stats['pending_parts'] = $db->query("SELECT COUNT(*) FROM spare_parts_requests WHERE status='pending'")->fetchColumn();
+} catch (Exception $e) { $stats['pending_parts'] = 0; }
 
 // Recent tickets (last 10)
 if ($user['role'] === 'user') {
@@ -108,6 +118,58 @@ include APP_ROOT . '/includes/header.php';
             </div>
         </div>
     </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <?php if (isModuleEnabled('periferiche') && $stats['periferiche_attive'] > 0): ?>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm text-dark bg-info bg-opacity-75">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="fs-2 fw-bold"><?= $stats['periferiche_attive'] ?></div>
+                    <div class="opacity-75">Periferiche Attive</div>
+                </div>
+                <i class="bi bi-hdd-network fs-1 opacity-50"></i>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="<?= APP_URL ?>/modules/periferiche/index.php" class="text-dark text-decoration-none small"><i class="bi bi-arrow-right me-1"></i>Visualizza</a>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    <?php if (isModuleEnabled('spedizioni') && $stats['da_spedire'] > 0): ?>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm text-white bg-secondary">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="fs-2 fw-bold"><?= $stats['da_spedire'] ?></div>
+                    <div class="opacity-75">Da Spedire</div>
+                </div>
+                <i class="bi bi-truck fs-1 opacity-50"></i>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="<?= APP_URL ?>/modules/spedizioni/index.php?status=da_spedire" class="text-white text-decoration-none small"><i class="bi bi-arrow-right me-1"></i>Visualizza</a>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    <?php if (isTechnician() && $stats['pending_parts'] > 0): ?>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm text-dark bg-warning bg-opacity-75">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="fs-2 fw-bold"><?= $stats['pending_parts'] ?></div>
+                    <div class="opacity-75">Richieste Ricambi In Attesa</div>
+                </div>
+                <i class="bi bi-cart-check fs-1 opacity-50"></i>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="<?= APP_URL ?>/modules/spare_parts/requests.php?status=pending" class="text-dark text-decoration-none small"><i class="bi bi-arrow-right me-1"></i>Gestisci</a>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
 </div>
 
 <div class="row g-4">

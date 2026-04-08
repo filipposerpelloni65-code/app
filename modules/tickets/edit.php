@@ -37,6 +37,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, category_id=?, assigned_to=?, codice_concessionario=?, updated_at=NOW()$closedAt WHERE id=?");
         $stmt->execute([$title, $description, $status, $priority, $category_id, $assigned_to, $codice_concessionario, $id]);
         logActivity($user['id'], 'edit', 'ticket', $id, "Modificato ticket: $title");
+        $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $id;
+        $prefix = getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
+        // Notify on assignment change
+        $prevAssigned = $ticket['assigned_to'] ? (int)$ticket['assigned_to'] : 0;
+        if ($assigned_to && $assigned_to != $prevAssigned && $assigned_to != $user['id']) {
+            createNotification($assigned_to, 'assign', 'Ticket assegnato a te: ' . $prefix, $title, 'ticket', $id, $ticketUrl);
+        }
+        // Notify on status change
+        if ($status !== $ticket['status']) {
+            $statusLabel = getStatusLabel($status);
+            $notifTitle  = 'Stato ticket ' . $prefix . ' → ' . $statusLabel;
+            $notified    = [$user['id']];
+            if ($ticket['created_by'] && !in_array((int)$ticket['created_by'], $notified)) {
+                createNotification((int)$ticket['created_by'], 'status', $notifTitle, '', 'ticket', $id, $ticketUrl);
+                $notified[] = (int)$ticket['created_by'];
+            }
+            if ($assigned_to && !in_array($assigned_to, $notified)) {
+                createNotification($assigned_to, 'status', $notifTitle, '', 'ticket', $id, $ticketUrl);
+            }
+        }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '&updated=1');
         exit;
     }

@@ -8,11 +8,70 @@ require_once __DIR__ . '/../../includes/modules.php';
 requireLogin();
 if (!isModuleEnabled('tickets')) { header('Location: ' . APP_URL . '/dashboard.php'); exit; }
 
+// Handle CSV export before page output
+if (isset($_GET['export']) && $_GET['export'] === 'csv' && isTechnician()) {
+    $db = getDB();
+    $user = currentUser();
+    $where = ['1=1'];
+    $params = [];
+    if (!empty($_GET['status']))      { $where[] = 't.status=?';      $params[] = $_GET['status']; }
+    if (!empty($_GET['priority']))    { $where[] = 't.priority=?';    $params[] = $_GET['priority']; }
+    if (!empty($_GET['category_id'])){ $where[] = 't.category_id=?'; $params[] = (int)$_GET['category_id']; }
+    if (!empty($_GET['dealer_id']))   { $where[] = 't.dealer_id=?';   $params[] = (int)$_GET['dealer_id']; }
+    if (!empty($_GET['q']))           { $where[] = '(t.title LIKE ? OR t.description LIKE ?)'; $params[] = '%'.$_GET['q'].'%'; $params[] = '%'.$_GET['q'].'%'; }
+    if ($user['role'] === 'user')    { $where[] = 't.created_by=?';  $params[] = $user['id']; }
+    $whereStr = implode(' AND ', $where);
+    $stmt = $db->prepare("SELECT t.id, t.title, t.status, t.priority, uc.full_name as creator_name, ua.full_name as assignee_name, c.name as category_name, d.name as dealer_name, t.created_at, t.updated_at FROM tickets t LEFT JOIN users ua ON t.assigned_to=ua.id LEFT JOIN users uc ON t.created_by=uc.id LEFT JOIN ticket_categories c ON t.category_id=c.id LEFT JOIN dealers d ON t.dealer_id=d.id WHERE $whereStr ORDER BY t.created_at DESC");
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="tickets_' . date('Ymd_His') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
+    fputcsv($out, ['ID','Prefisso','Titolo','Stato','Priorità','Categoria','Creato da','Assegnato a','Concessionario','Creato il','Aggiornato il'], ';');
+    foreach ($rows as $r) {
+        fputcsv($out, [
+            $r['id'],
+            getTicketPrefix() . '-' . str_pad($r['id'], 4, '0', STR_PAD_LEFT),
+            $r['title'],
+            getStatusLabel($r['status']),
+            getPriorityLabel($r['priority']),
+            $r['category_name'] ?? '',
+            $r['creator_name'] ?? '',
+            $r['assignee_name'] ?? '',
+            $r['dealer_name'] ?? '',
+            $r['created_at'],
+            $r['updated_at'],
+        ], ';');
+    }
+    fclose($out);
+    exit;
+}
+
 define('PAGE_TITLE', 'Ticket');
 define('BREADCRUMB', ['Dashboard' => APP_URL . '/dashboard.php', 'Ticket' => '']);
 
 $db = getDB();
 $user = currentUser();
+
+// Handle delete (admin only)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_ticket' && isAdmin()) {
+    if (validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        $delId = (int)($_POST['ticket_id'] ?? 0);
+        if ($delId) {
+            $db->prepare("DELETE FROM ticket_comments WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("DELETE FROM ticket_attachments WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("DELETE FROM ticket_uscite WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("UPDATE spare_parts_requests SET ticket_id=NULL WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("UPDATE rapportini SET ticket_id=NULL WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("UPDATE periferiche_guaste SET ticket_id=NULL WHERE ticket_id=?")->execute([$delId]);
+            $db->prepare("DELETE FROM tickets WHERE id=?")->execute([$delId]);
+            logActivity($user['id'], 'delete', 'ticket', $delId, "Eliminato ticket $delId");
+        }
+    }
+    header('Location: ' . APP_URL . '/modules/tickets/index.php?deleted=1');
+    exit;
+}
 
 $perPage = (int)getSetting('items_per_page', '25');
 $page = max(1, (int)($_GET['page'] ?? 1));
@@ -55,8 +114,17 @@ include APP_ROOT . '/includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-ticket-detailed me-2 text-primary"></i>Gestione Ticket</h4>
-    <a href="<?= APP_URL ?>/modules/tickets/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuovo Ticket</a>
+    <div class="d-flex gap-2">
+        <?php if (isTechnician()): ?>
+        <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'csv'])) ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-download me-1"></i>Esporta CSV</a>
+        <?php endif; ?>
+        <a href="<?= APP_URL ?>/modules/tickets/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuovo Ticket</a>
+    </div>
 </div>
+
+<?php if (isset($_GET['deleted'])): ?>
+<div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle me-2"></i>Ticket eliminato con successo. <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+<?php endif; ?>
 
 <!-- Filters -->
 <div class="card border-0 shadow-sm mb-4">
@@ -169,6 +237,21 @@ include APP_ROOT . '/includes/header.php';
                                     data-bs-toggle="tooltip"><i class="bi bi-arrow-repeat"></i></button>
                                 <?php endif; ?>
                                 <?php endif; ?>
+                                <?php if (isAdmin()): ?>
+                                <button type="button" class="btn btn-outline-danger"
+                                    data-confirm="Eliminare il ticket <?= h(getTicketPrefix() . '-' . str_pad($t['id'], 4, '0', STR_PAD_LEFT)) ?> definitivamente?"
+                                    data-confirm-class="btn-danger"
+                                    data-confirm-text="Elimina"
+                                    title="Elimina"
+                                    onclick="document.getElementById('delform<?= $t['id'] ?>').submit()">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                <form id="delform<?= $t['id'] ?>" method="post" style="display:none">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="action" value="delete_ticket">
+                                    <input type="hidden" name="ticket_id" value="<?= $t['id'] ?>">
+                                </form>
+                                <?php endif; ?>
                             </div>
                         </td>
                     </tr>
@@ -243,3 +326,31 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
 </script>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
+<!-- Quick status change hidden form -->
+<form id="quickStatusForm" method="post" action="<?= APP_URL ?>/api/tickets.php" style="display:none">
+    <input type="hidden" name="action" value="update_status">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCsrfToken()) ?>">
+    <input type="hidden" name="id" id="quickStatusTicketId">
+    <input type="hidden" name="status" id="quickStatusValue">
+</form>
+<script>
+document.querySelectorAll('.quick-status-change').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+        e.preventDefault();
+        var label = this.textContent.trim();
+        if (!confirm('Impostare lo stato a "' + label + '"?')) return;
+        document.getElementById('quickStatusTicketId').value = this.dataset.ticketId;
+        document.getElementById('quickStatusValue').value = this.dataset.status;
+        // Use fetch to avoid page reload
+        var form = document.getElementById('quickStatusForm');
+        var data = new FormData(form);
+        fetch(form.action, { method: 'POST', body: data })
+            .then(function(r){ return r.json(); })
+            .then(function(resp) {
+                if (resp.success) { location.reload(); }
+                else { alert('Errore: ' + (resp.error || 'Sconosciuto')); }
+            })
+            .catch(function() { alert('Errore di comunicazione.'); });
+    });
+});
+</script>

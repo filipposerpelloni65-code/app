@@ -163,3 +163,120 @@ function getModalOpenTickets(int $limit = 100): array {
     $stmt->execute([$limit]);
     return $stmt->fetchAll();
 }
+
+function getSpedizioneStatusBadge(string $status): string {
+    $badges = [
+        'da_spedire'  => '<span class="badge bg-secondary">Da Spedire</span>',
+        'spedita'     => '<span class="badge bg-primary">Spedita</span>',
+        'consegnata'  => '<span class="badge bg-success">Consegnata</span>',
+        'annullata'   => '<span class="badge bg-danger">Annullata</span>',
+    ];
+    return $badges[$status] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($status) . '</span>';
+}
+
+function getSpedizioneStatusLabel(string $status): string {
+    $labels = [
+        'da_spedire' => 'Da Spedire',
+        'spedita'    => 'Spedita',
+        'consegnata' => 'Consegnata',
+        'annullata'  => 'Annullata',
+    ];
+    return $labels[$status] ?? $status;
+}
+
+function getNotificationCounts(): array {
+    try {
+        $db = getDB();
+        $counts = [
+            'pending_parts'    => (int)$db->query("SELECT COUNT(*) FROM spare_parts_requests WHERE status='pending'")->fetchColumn(),
+            'open_tickets'     => (int)$db->query("SELECT COUNT(*) FROM tickets WHERE status='open'")->fetchColumn(),
+            'da_spedire'       => (int)$db->query("SELECT COUNT(*) FROM spedizioni WHERE status='da_spedire'")->fetchColumn(),
+            'periferiche_wait' => (int)$db->query("SELECT COUNT(*) FROM periferiche_guaste WHERE stato IN ('in_giacenza','in_diagnosi')")->fetchColumn(),
+        ];
+        return $counts;
+    } catch (Exception $e) {
+        return ['pending_parts' => 0, 'open_tickets' => 0, 'da_spedire' => 0, 'periferiche_wait' => 0];
+    }
+}
+
+function getAutoAssignee(): ?int {
+    try {
+        $db = getDB();
+        // Round-robin: pick the technician with fewest open tickets
+        $stmt = $db->query("
+            SELECT u.id, COUNT(t.id) AS open_count
+            FROM users u
+            LEFT JOIN tickets t ON t.assigned_to = u.id AND t.status NOT IN ('resolved','closed')
+            WHERE u.role IN ('admin','technician') AND u.active = 1
+            GROUP BY u.id
+            ORDER BY open_count ASC, u.id ASC
+            LIMIT 1
+        ");
+        $row = $stmt->fetch();
+        return $row ? (int)$row['id'] : null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+function getComponenteTipoBadge(string $tipo): string {
+    $badges = [
+        'periferica' => '<span class="badge bg-primary">Periferica</span>',
+        'accessorio' => '<span class="badge bg-info text-dark">Accessorio</span>',
+        'cavo'       => '<span class="badge bg-secondary">Cavo</span>',
+    ];
+    return $badges[$tipo] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($tipo) . '</span>';
+}
+
+function getComponenteTipoLabel(string $tipo): string {
+    $labels = [
+        'periferica' => 'Periferica',
+        'accessorio' => 'Accessorio',
+        'cavo'       => 'Cavo',
+    ];
+    return $labels[$tipo] ?? $tipo;
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+function createNotification(int $userId, string $type, string $title, string $message = '', string $entityType = '', int $entityId = 0, string $url = ''): void {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare('INSERT INTO notifications (user_id, type, title, message, entity_type, entity_id, url) VALUES (?,?,?,?,?,?,?)');
+        $stmt->execute([
+            $userId,
+            $type,
+            $title,
+            $message,
+            $entityType ?: null,
+            $entityId ?: null,
+            $url ?: null,
+        ]);
+    } catch (Exception $e) {
+        // Fail silently — notifications must not break main flow
+    }
+}
+
+function getUnreadNotificationCount(int $userId): int {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
+        $stmt->execute([$userId]);
+        return (int)$stmt->fetchColumn();
+    } catch (Exception $e) {
+        return 0;
+    }
+}
+
+function notifyAdmins(string $type, string $title, string $message = '', string $entityType = '', int $entityId = 0, string $url = '', int $excludeUserId = 0): void {
+    try {
+        $db = getDB();
+        $admins = $db->query("SELECT id FROM users WHERE role = 'admin' AND active = 1")->fetchAll();
+        foreach ($admins as $admin) {
+            if ($admin['id'] == $excludeUserId) continue;
+            createNotification((int)$admin['id'], $type, $title, $message, $entityType, $entityId, $url);
+        }
+    } catch (Exception $e) {
+        // Fail silently
+    }
+}

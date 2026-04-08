@@ -8,12 +8,15 @@ $appName = defined('APP_NAME') ? APP_NAME : 'HelpDesk';
 $enabledModules = getEnabledModules();
 $currentScript = basename($_SERVER['PHP_SELF']);
 $currentPath = $_SERVER['PHP_SELF'] ?? '';
+$notifCounts = $currentUser ? getNotificationCounts() : [];
 ?>
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?= htmlspecialchars(generateCsrfToken()) ?>">
+    <meta name="app-url" content="<?= htmlspecialchars(APP_URL) ?>">
     <title><?= defined('PAGE_TITLE') ? h(PAGE_TITLE) . ' - ' : '' ?><?= h($appName) ?></title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -33,6 +36,9 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
             <li class="nav-item">
                 <a href="<?= APP_URL ?>/dashboard.php" class="nav-link text-white <?= strpos($currentPath, 'dashboard.php') !== false ? 'active' : '' ?>">
                     <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                    <?php if (($notifCounts['open_tickets'] ?? 0) > 0): ?>
+                    <span class="badge bg-primary ms-auto"><?= $notifCounts['open_tickets'] ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <?php foreach ($enabledModules as $module): ?>
@@ -41,10 +47,19 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
                 $modPath = '/modules/' . $module['slug'] . '/';
                 $isActive = strpos($currentPath, $modPath) !== false;
                 if (in_array($module['slug'], ['users', 'settings']) && !isAdmin()) continue;
+                // Notification badge per modulo
+                $badge = '';
+                if ($module['slug'] === 'spare_parts' && ($notifCounts['pending_parts'] ?? 0) > 0) {
+                    $badge = '<span class="badge bg-warning text-dark ms-auto">' . $notifCounts['pending_parts'] . '</span>';
+                } elseif ($module['slug'] === 'spedizioni' && ($notifCounts['da_spedire'] ?? 0) > 0) {
+                    $badge = '<span class="badge bg-primary ms-auto">' . $notifCounts['da_spedire'] . '</span>';
+                } elseif ($module['slug'] === 'periferiche' && ($notifCounts['periferiche_wait'] ?? 0) > 0) {
+                    $badge = '<span class="badge bg-info text-dark ms-auto">' . $notifCounts['periferiche_wait'] . '</span>';
+                }
             ?>
             <li class="nav-item">
                 <a href="<?= h($modUrl) ?>" class="nav-link text-white <?= $isActive ? 'active' : '' ?>">
-                    <i class="bi <?= h($module['icon']) ?> me-2"></i><?= h($module['name']) ?>
+                    <i class="bi <?= h($module['icon']) ?> me-2"></i><?= h($module['name']) ?><?= $badge ?>
                 </a>
             </li>
             <?php endforeach; ?>
@@ -82,11 +97,56 @@ $currentPath = $_SERVER['PHP_SELF'] ?? '';
                     <?php endif; ?>
                 </ol>
             </nav>
+            <?php
+            $notifUnread = getUnreadNotificationCount((int)$currentUser['id']);
+            ?>
+            <!-- Global search -->
+            <form class="d-none d-md-flex me-2 position-relative" id="globalSearchForm" autocomplete="off">
+                <div class="input-group input-group-sm" style="width:240px">
+                    <input type="search" class="form-control" id="globalSearchInput" placeholder="Cerca..." aria-label="Cerca">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                </div>
+                <div id="searchResults" class="dropdown-menu shadow-sm p-0" style="display:none;min-width:320px;position:absolute;top:100%;right:0;z-index:1050"></div>
+            </form>
+            <!-- Notification Bell -->
+            <div class="dropdown me-2" id="notif-dropdown">
+                <a href="#" class="btn btn-outline-secondary position-relative notif-bell-btn"
+                   data-bs-toggle="dropdown" aria-expanded="false"
+                   title="Notifiche">
+                    <i class="bi bi-bell"></i>
+                    <span id="notif-bell-badge"
+                          class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                          <?= $notifUnread === 0 ? 'style="display:none"' : '' ?>>
+                        <?= $notifUnread > 99 ? '99+' : $notifUnread ?>
+                    </span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end shadow notif-dropdown-menu p-0" style="min-width:360px;max-width:420px">
+                    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                        <strong class="small">Notifiche</strong>
+                        <a href="<?= APP_URL ?>/modules/notifications/index.php" class="small text-primary text-decoration-none">Vedi tutte</a>
+                    </div>
+                    <div id="notif-dropdown-list" style="max-height:380px;overflow-y:auto">
+                        <div class="text-center text-muted py-3 small" id="notif-loading">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                        </div>
+                    </div>
+                    <div class="border-top px-3 py-2 d-flex justify-content-between">
+                        <button class="btn btn-sm btn-link text-muted p-0" id="notif-mark-all">
+                            <i class="bi bi-check2-all me-1"></i>Segna tutto letto
+                        </button>
+                        <a href="<?= APP_URL ?>/modules/notifications/index.php" class="btn btn-sm btn-link text-primary p-0">
+                            Centro notifiche <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
             <span class="badge bg-<?= $currentUser['role'] === 'admin' ? 'danger' : ($currentUser['role'] === 'technician' ? 'warning text-dark' : 'primary') ?> ms-2">
                 <?= h(ucfirst($currentUser['role'])) ?>
             </span>
         </nav>
         <div class="container-fluid p-4">
+<!-- Toast container for real-time notifications -->
+<div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1100"></div>
 <?php else: ?>
 <div class="container-fluid">
 <?php endif; ?>

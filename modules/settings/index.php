@@ -19,7 +19,7 @@ $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['section'] ?? '') === 'general') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido.'; }
     else {
-        $fields = ['company_name','ticket_prefix','items_per_page','email_notifications','smtp_host','smtp_port','smtp_user'];
+        $fields = ['company_name','ticket_prefix','items_per_page','email_notifications','smtp_host','smtp_port','smtp_user','auto_close_days','auto_close_secret','auto_assign'];
         foreach ($fields as $k) {
             $v = trim($_POST[$k] ?? '');
             $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?")->execute([$k,$v,$v]);
@@ -144,6 +144,28 @@ include APP_ROOT . '/includes/header.php';
                 <div class="col-md-5">
                     <label class="form-label">Password SMTP <small class="text-muted">(lascia vuoto per non cambiare)</small></label>
                     <input type="password" name="smtp_pass" class="form-control">
+                </div>
+            </div>
+            <hr>
+            <h6 class="mb-3"><i class="bi bi-robot me-1"></i>Automazioni</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <label class="form-label">Auto-assegnazione Ticket</label>
+                    <select name="auto_assign" class="form-select">
+                        <option value="0" <?= ($settings['auto_assign']??'0')==='0'?'selected':'' ?>>Disabilitata</option>
+                        <option value="1" <?= ($settings['auto_assign']??'0')==='1'?'selected':'' ?>>Abilitata</option>
+                    </select>
+                    <small class="text-muted">Auto-assegna nuovi ticket al tecnico con meno carico</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Giorni per Auto-chiusura</label>
+                    <input type="number" name="auto_close_days" class="form-control" min="0" value="<?= h($settings['auto_close_days'] ?? '0') ?>">
+                    <small class="text-muted">0 = disabilitato. Chiude ticket "Risolti" dopo N giorni.</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Chiave Segreta Auto-chiusura (cron)</label>
+                    <input type="text" name="auto_close_secret" class="form-control font-monospace" value="<?= h($settings['auto_close_secret'] ?? '') ?>" placeholder="Lascia vuoto per disabilitare la chiamata cron">
+                    <small class="text-muted">Cron: <code>/api/auto_close.php?secret=&lt;chiave&gt;</code></small>
                 </div>
             </div>
             <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salva</button>
