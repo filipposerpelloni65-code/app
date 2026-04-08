@@ -207,6 +207,7 @@ include APP_ROOT . '/includes/header.php';
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-modules'?'active':'' ?>" data-bs-toggle="tab" href="#tab-modules"><i class="bi bi-puzzle me-1"></i>Moduli</a></li>
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-cats'?'active':'' ?>" data-bs-toggle="tab" href="#tab-cats"><i class="bi bi-tags me-1"></i>Categorie Ticket</a></li>
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-pcats'?'active':'' ?>" data-bs-toggle="tab" href="#tab-pcats"><i class="bi bi-tools me-1"></i>Categorie Ricambi</a></li>
+    <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-custom'?'active':'' ?>" data-bs-toggle="tab" href="#tab-custom"><i class="bi bi-ui-checks me-1"></i>Campi Personalizzati</a></li>
 </ul>
 
 <div class="tab-content">
@@ -626,65 +627,346 @@ include APP_ROOT . '/includes/header.php';
 
     <!-- ── TAB: Categorie Ticket ────────────────────────────────────────── -->
     <div class="tab-pane fade <?= $activeTab==='tab-cats'?'show active':'' ?>" id="tab-cats">
-        <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white"><h6 class="mb-0">Aggiungi Categoria Ticket</h6></div><div class="card-body">
-        <form method="post" class="row g-2">
-            <?= csrfField() ?><input type="hidden" name="section" value="add_cat">
-            <div class="col-md-5"><input type="text" name="cat_name" class="form-control" placeholder="Nome" required></div>
-            <div class="col-md-5"><input type="text" name="cat_desc" class="form-control" placeholder="Descrizione"></div>
-            <div class="col-md-2"><button type="submit" class="btn btn-success w-100"><i class="bi bi-plus-lg me-1"></i>Aggiungi</button></div>
-        </form>
-        </div></div>
-        <div class="card border-0 shadow-sm"><div class="card-body p-0">
-            <table class="table table-hover mb-0">
-                <thead class="table-light"><tr><th>Nome</th><th>Descrizione</th><th></th></tr></thead>
-                <tbody>
-                <?php if ($ticketCats): foreach ($ticketCats as $c): ?>
-                <tr>
-                    <td><?= h($c['name']) ?></td>
-                    <td class="small text-muted"><?= h($c['description']??'') ?></td>
-                    <td>
-                        <form method="post" class="d-inline">
-                            <?= csrfField() ?><input type="hidden" name="section" value="del_cat"><input type="hidden" name="cat_id" value="<?= $c['id'] ?>">
-                            <button type="submit"
-                                class="btn btn-sm btn-outline-danger"
-                                data-confirm="Eliminare questa categoria?"
-                                data-confirm-class="btn-danger"
-                                data-confirm-text="Elimina"><i class="bi bi-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; else: ?>
-                <tr><td colspan="3" class="text-center text-muted py-3">Nessuna categoria</td></tr>
-                <?php endif; ?>
-                </tbody>
-            </table>
-        </div></div>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Categorie Ticket</h6>
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#catAddModal">
+                    <i class="bi bi-plus-lg me-1"></i>Aggiungi
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0" id="ticketCatsTable">
+                    <thead class="table-light"><tr><th>Nome</th><th>Descrizione</th><th style="width:120px"></th></tr></thead>
+                    <tbody>
+                    <?php if ($ticketCats): foreach ($ticketCats as $c): ?>
+                    <tr id="tc-row-<?= $c['id'] ?>">
+                        <td class="fw-semibold"><?= h($c['name']) ?></td>
+                        <td class="small text-muted"><?= h($c['description']??'') ?></td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary tc-edit"
+                                    data-id="<?= $c['id'] ?>"
+                                    data-name="<?= h($c['name']) ?>"
+                                    data-desc="<?= h($c['description']??'') ?>"
+                                    title="Modifica"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-danger tc-delete"
+                                    data-id="<?= $c['id'] ?>"
+                                    data-name="<?= h($c['name']) ?>"
+                                    title="Elimina"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; else: ?>
+                    <tr id="tc-empty"><td colspan="3" class="text-center text-muted py-3">Nessuna categoria</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- ── TAB: Categorie Ricambi ───────────────────────────────────────── -->
     <div class="tab-pane fade <?= $activeTab==='tab-pcats'?'show active':'' ?>" id="tab-pcats">
-        <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white"><h6 class="mb-0">Aggiungi Categoria Ricambi</h6></div><div class="card-body">
-        <form method="post" class="row g-2">
-            <?= csrfField() ?><input type="hidden" name="section" value="add_pcat">
-            <div class="col-md-5"><input type="text" name="pcat_name" class="form-control" placeholder="Nome" required></div>
-            <div class="col-md-5"><input type="text" name="pcat_desc" class="form-control" placeholder="Descrizione"></div>
-            <div class="col-md-2"><button type="submit" class="btn btn-success w-100"><i class="bi bi-plus-lg me-1"></i>Aggiungi</button></div>
-        </form>
-        </div></div>
-        <div class="card border-0 shadow-sm"><div class="card-body p-0">
-            <table class="table table-hover mb-0">
-                <thead class="table-light"><tr><th>Nome</th><th>Descrizione</th></tr></thead>
-                <tbody>
-                <?php if ($partsCats): foreach ($partsCats as $c): ?>
-                <tr><td><?= h($c['name']) ?></td><td class="small text-muted"><?= h($c['description']??'') ?></td></tr>
-                <?php endforeach; else: ?>
-                <tr><td colspan="2" class="text-center text-muted py-3">Nessuna categoria</td></tr>
-                <?php endif; ?>
-                </tbody>
-            </table>
-        </div></div>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Categorie Ricambi</h6>
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#pcatAddModal">
+                    <i class="bi bi-plus-lg me-1"></i>Aggiungi
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0" id="partsCatsTable">
+                    <thead class="table-light"><tr><th>Nome</th><th>Descrizione</th><th style="width:120px"></th></tr></thead>
+                    <tbody>
+                    <?php if ($partsCats): foreach ($partsCats as $c): ?>
+                    <tr id="pc-row-<?= $c['id'] ?>">
+                        <td class="fw-semibold"><?= h($c['name']) ?></td>
+                        <td class="small text-muted"><?= h($c['description']??'') ?></td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary pc-edit"
+                                    data-id="<?= $c['id'] ?>"
+                                    data-name="<?= h($c['name']) ?>"
+                                    data-desc="<?= h($c['description']??'') ?>"
+                                    title="Modifica"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-danger pc-delete"
+                                    data-id="<?= $c['id'] ?>"
+                                    data-name="<?= h($c['name']) ?>"
+                                    title="Elimina"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; else: ?>
+                    <tr id="pc-empty"><td colspan="3" class="text-center text-muted py-3">Nessuna categoria</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
+    <!-- ── TAB: Campi Personalizzati ─────────────────────────────────────── -->
+    <div class="tab-pane fade <?= $activeTab==='tab-custom'?'show active':'' ?>" id="tab-custom">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-0">Campi Personalizzati Ticket</h6>
+                    <small class="text-muted">Aggiungi campi extra ai ticket (testo, numero, data, selezione, ecc.)</small>
+                </div>
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#cfAddModal">
+                    <i class="bi bi-plus-lg me-1"></i>Aggiungi Campo
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0" id="customFieldsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Etichetta</th>
+                            <th>Nome Campo</th>
+                            <th>Tipo</th>
+                            <th>Obbligatorio</th>
+                            <th>Ordine</th>
+                            <th>Stato</th>
+                            <th style="width:130px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="cfTbody">
+                        <tr id="cf-loading"><td colspan="7" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Caricamento...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODALS: Ticket Categories
+     ══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Add Ticket Category -->
+<div class="modal fade" id="catAddModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-tag me-2 text-success"></i>Aggiungi Categoria Ticket</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="catAddError" class="alert alert-danger d-none"></div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                    <input type="text" id="catAddName" class="form-control" placeholder="Nome categoria" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Descrizione</label>
+                    <input type="text" id="catAddDesc" class="form-control" placeholder="Descrizione (opzionale)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annulla</button>
+                <button type="button" class="btn btn-success" id="catAddSaveBtn"><i class="bi bi-check-lg me-1"></i>Aggiungi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Ticket Category -->
+<div class="modal fade" id="catEditModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2 text-warning"></i>Modifica Categoria Ticket</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="catEditError" class="alert alert-danger d-none"></div>
+                <input type="hidden" id="catEditId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                    <input type="text" id="catEditName" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Descrizione</label>
+                    <input type="text" id="catEditDesc" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annulla</button>
+                <button type="button" class="btn btn-warning" id="catEditSaveBtn"><i class="bi bi-save me-1"></i>Salva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODALS: Spare Parts Categories
+     ══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Add Spare Parts Category -->
+<div class="modal fade" id="pcatAddModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-tools me-2 text-success"></i>Aggiungi Categoria Ricambi</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="pcatAddError" class="alert alert-danger d-none"></div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                    <input type="text" id="pcatAddName" class="form-control" placeholder="Nome categoria" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Descrizione</label>
+                    <input type="text" id="pcatAddDesc" class="form-control" placeholder="Descrizione (opzionale)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annulla</button>
+                <button type="button" class="btn btn-success" id="pcatAddSaveBtn"><i class="bi bi-check-lg me-1"></i>Aggiungi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Spare Parts Category -->
+<div class="modal fade" id="pcatEditModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2 text-warning"></i>Modifica Categoria Ricambi</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="pcatEditError" class="alert alert-danger d-none"></div>
+                <input type="hidden" id="pcatEditId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                    <input type="text" id="pcatEditName" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Descrizione</label>
+                    <input type="text" id="pcatEditDesc" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annulla</button>
+                <button type="button" class="btn btn-warning" id="pcatEditSaveBtn"><i class="bi bi-save me-1"></i>Salva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODALS: Custom Fields
+     ══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Add Custom Field -->
+<div class="modal fade" id="cfAddModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-ui-checks me-2 text-success"></i>Aggiungi Campo Personalizzato</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="cfAddError" class="alert alert-danger d-none"></div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Etichetta <span class="text-danger">*</span></label>
+                        <input type="text" id="cfAddLabel" class="form-control" placeholder="Es: Numero Seriale">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Tipo Campo</label>
+                        <select id="cfAddType" class="form-select">
+                            <option value="text">Testo</option>
+                            <option value="textarea">Testo lungo</option>
+                            <option value="number">Numero</option>
+                            <option value="date">Data</option>
+                            <option value="select">Selezione</option>
+                            <option value="checkbox">Checkbox</option>
+                        </select>
+                    </div>
+                    <div class="col-12 cf-options-row d-none">
+                        <label class="form-label fw-semibold">Opzioni <small class="text-muted">(una per riga)</small></label>
+                        <textarea id="cfAddOptions" class="form-control font-monospace" rows="4" placeholder="Opzione 1&#10;Opzione 2&#10;Opzione 3"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Ordine di visualizzazione</label>
+                        <input type="number" id="cfAddSort" class="form-control" value="0" min="0">
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="cfAddRequired">
+                            <label class="form-check-label fw-semibold" for="cfAddRequired">Campo obbligatorio</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annulla</button>
+                <button type="button" class="btn btn-success" id="cfAddSaveBtn"><i class="bi bi-check-lg me-1"></i>Aggiungi Campo</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Custom Field -->
+<div class="modal fade" id="cfEditModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2 text-warning"></i>Modifica Campo Personalizzato</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="cfEditError" class="alert alert-danger d-none"></div>
+                <input type="hidden" id="cfEditId">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Etichetta <span class="text-danger">*</span></label>
+                        <input type="text" id="cfEditLabel" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Tipo Campo</label>
+                        <select id="cfEditType" class="form-select">
+                            <option value="text">Testo</option>
+                            <option value="textarea">Testo lungo</option>
+                            <option value="number">Numero</option>
+                            <option value="date">Data</option>
+                            <option value="select">Selezione</option>
+                            <option value="checkbox">Checkbox</option>
+                        </select>
+                    </div>
+                    <div class="col-12 cf-edit-options-row d-none">
+                        <label class="form-label fw-semibold">Opzioni <small class="text-muted">(una per riga)</small></label>
+                        <textarea id="cfEditOptions" class="form-control font-monospace" rows="4"></textarea>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Ordine</label>
+                        <input type="number" id="cfEditSort" class="form-control" min="0">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="cfEditRequired">
+                            <label class="form-check-label fw-semibold" for="cfEditRequired">Obbligatorio</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="cfEditActive">
+                            <label class="form-check-label fw-semibold" for="cfEditActive">Attivo</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annulla</button>
+                <button type="button" class="btn btn-warning" id="cfEditSaveBtn"><i class="bi bi-save me-1"></i>Salva Modifiche</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -703,6 +985,351 @@ include APP_ROOT . '/includes/header.php';
         picker.addEventListener('input', function() { text.value = picker.value; });
     });
 })();
+
+// ── Settings AJAX helpers ────────────────────────────────────────────────────
+(function() {
+    'use strict';
+
+    var apiUrl   = <?= json_encode(APP_URL . '/api/settings.php') ?>;
+    var csrfToken = document.querySelector('meta[name="csrf-token"]') ?
+                    document.querySelector('meta[name="csrf-token"]').content : '';
+
+    function apiPost(action, data, onOk, onErr) {
+        data.action = action;
+        data.csrf_token = csrfToken;
+        $.ajax({
+            url: apiUrl,
+            method: 'POST',
+            data: data,
+            dataType: 'json',
+            success: function(r) {
+                if (r.success) { onOk(r); }
+                else { onErr(r.error || 'Errore.'); }
+            },
+            error: function() { onErr('Errore di comunicazione con il server.'); }
+        });
+    }
+
+    function showErr(elId, msg) {
+        var el = document.getElementById(elId);
+        if (el) { el.textContent = msg; el.classList.remove('d-none'); }
+    }
+    function hideErr(elId) {
+        var el = document.getElementById(elId);
+        if (el) { el.classList.add('d-none'); }
+    }
+    function escHtml(s) {
+        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── TICKET CATEGORIES ──────────────────────────────────────────────────
+
+    // Add
+    document.getElementById('catAddSaveBtn').addEventListener('click', function() {
+        hideErr('catAddError');
+        var name = document.getElementById('catAddName').value.trim();
+        var desc = document.getElementById('catAddDesc').value.trim();
+        if (!name) { showErr('catAddError', 'Il nome è obbligatorio.'); return; }
+        apiPost('add_ticket_cat', {name: name, description: desc}, function(r) {
+            var tbody = document.querySelector('#ticketCatsTable tbody');
+            var empty = document.getElementById('tc-empty');
+            if (empty) empty.remove();
+            var row = '<tr id="tc-row-' + r.id + '">' +
+                '<td class="fw-semibold">' + escHtml(r.name) + '</td>' +
+                '<td class="small text-muted">' + escHtml(r.description) + '</td>' +
+                '<td><div class="btn-group btn-group-sm">' +
+                '<button class="btn btn-outline-secondary tc-edit" data-id="' + r.id + '" data-name="' + escHtml(r.name) + '" data-desc="' + escHtml(r.description) + '" title="Modifica"><i class="bi bi-pencil"></i></button>' +
+                '<button class="btn btn-outline-danger tc-delete" data-id="' + r.id + '" data-name="' + escHtml(r.name) + '" title="Elimina"><i class="bi bi-trash"></i></button>' +
+                '</div></td></tr>';
+            tbody.insertAdjacentHTML('beforeend', row);
+            document.getElementById('catAddName').value = '';
+            document.getElementById('catAddDesc').value = '';
+            bootstrap.Modal.getInstance(document.getElementById('catAddModal')).hide();
+        }, function(err) { showErr('catAddError', err); });
+    });
+
+    // Edit (open modal)
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.tc-edit');
+        if (!btn) return;
+        hideErr('catEditError');
+        document.getElementById('catEditId').value   = btn.dataset.id;
+        document.getElementById('catEditName').value = btn.dataset.name;
+        document.getElementById('catEditDesc').value = btn.dataset.desc;
+        (bootstrap.Modal.getOrCreateInstance(document.getElementById('catEditModal'))).show();
+    });
+
+    document.getElementById('catEditSaveBtn').addEventListener('click', function() {
+        hideErr('catEditError');
+        var id   = document.getElementById('catEditId').value;
+        var name = document.getElementById('catEditName').value.trim();
+        var desc = document.getElementById('catEditDesc').value.trim();
+        if (!name) { showErr('catEditError', 'Il nome è obbligatorio.'); return; }
+        apiPost('edit_ticket_cat', {id: id, name: name, description: desc}, function(r) {
+            var row = document.getElementById('tc-row-' + r.id);
+            if (row) {
+                row.cells[0].textContent = r.name;
+                row.cells[1].textContent = r.description;
+                var editBtn = row.querySelector('.tc-edit');
+                if (editBtn) { editBtn.dataset.name = r.name; editBtn.dataset.desc = r.description; }
+            }
+            bootstrap.Modal.getInstance(document.getElementById('catEditModal')).hide();
+        }, function(err) { showErr('catEditError', err); });
+    });
+
+    // Delete
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.tc-delete');
+        if (!btn) return;
+        showConfirmModal('Eliminare la categoria "' + btn.dataset.name + '"?', function() {
+            apiPost('delete_ticket_cat', {id: btn.dataset.id}, function() {
+                var row = document.getElementById('tc-row-' + btn.dataset.id);
+                if (row) row.remove();
+                if (!document.querySelector('#ticketCatsTable tbody tr')) {
+                    document.querySelector('#ticketCatsTable tbody').innerHTML =
+                        '<tr id="tc-empty"><td colspan="3" class="text-center text-muted py-3">Nessuna categoria</td></tr>';
+                }
+            }, function(err) {
+                showConfirmModal(err, null, {title:'Errore', hideOk:true});
+            });
+        }, {title:'Elimina Categoria', btnClass:'btn-danger', btnText:'Elimina'});
+    });
+
+    // ── SPARE PARTS CATEGORIES ─────────────────────────────────────────────
+
+    document.getElementById('pcatAddSaveBtn').addEventListener('click', function() {
+        hideErr('pcatAddError');
+        var name = document.getElementById('pcatAddName').value.trim();
+        var desc = document.getElementById('pcatAddDesc').value.trim();
+        if (!name) { showErr('pcatAddError', 'Il nome è obbligatorio.'); return; }
+        apiPost('add_parts_cat', {name: name, description: desc}, function(r) {
+            var tbody = document.querySelector('#partsCatsTable tbody');
+            var empty = document.getElementById('pc-empty');
+            if (empty) empty.remove();
+            var row = '<tr id="pc-row-' + r.id + '">' +
+                '<td class="fw-semibold">' + escHtml(r.name) + '</td>' +
+                '<td class="small text-muted">' + escHtml(r.description) + '</td>' +
+                '<td><div class="btn-group btn-group-sm">' +
+                '<button class="btn btn-outline-secondary pc-edit" data-id="' + r.id + '" data-name="' + escHtml(r.name) + '" data-desc="' + escHtml(r.description) + '" title="Modifica"><i class="bi bi-pencil"></i></button>' +
+                '<button class="btn btn-outline-danger pc-delete" data-id="' + r.id + '" data-name="' + escHtml(r.name) + '" title="Elimina"><i class="bi bi-trash"></i></button>' +
+                '</div></td></tr>';
+            tbody.insertAdjacentHTML('beforeend', row);
+            document.getElementById('pcatAddName').value = '';
+            document.getElementById('pcatAddDesc').value = '';
+            bootstrap.Modal.getInstance(document.getElementById('pcatAddModal')).hide();
+        }, function(err) { showErr('pcatAddError', err); });
+    });
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.pc-edit');
+        if (!btn) return;
+        hideErr('pcatEditError');
+        document.getElementById('pcatEditId').value   = btn.dataset.id;
+        document.getElementById('pcatEditName').value = btn.dataset.name;
+        document.getElementById('pcatEditDesc').value = btn.dataset.desc;
+        (bootstrap.Modal.getOrCreateInstance(document.getElementById('pcatEditModal'))).show();
+    });
+
+    document.getElementById('pcatEditSaveBtn').addEventListener('click', function() {
+        hideErr('pcatEditError');
+        var id   = document.getElementById('pcatEditId').value;
+        var name = document.getElementById('pcatEditName').value.trim();
+        var desc = document.getElementById('pcatEditDesc').value.trim();
+        if (!name) { showErr('pcatEditError', 'Il nome è obbligatorio.'); return; }
+        apiPost('edit_parts_cat', {id: id, name: name, description: desc}, function(r) {
+            var row = document.getElementById('pc-row-' + r.id);
+            if (row) {
+                row.cells[0].textContent = r.name;
+                row.cells[1].textContent = r.description;
+                var editBtn = row.querySelector('.pc-edit');
+                if (editBtn) { editBtn.dataset.name = r.name; editBtn.dataset.desc = r.description; }
+            }
+            bootstrap.Modal.getInstance(document.getElementById('pcatEditModal')).hide();
+        }, function(err) { showErr('pcatEditError', err); });
+    });
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.pc-delete');
+        if (!btn) return;
+        showConfirmModal('Eliminare la categoria "' + btn.dataset.name + '"?', function() {
+            apiPost('delete_parts_cat', {id: btn.dataset.id}, function() {
+                var row = document.getElementById('pc-row-' + btn.dataset.id);
+                if (row) row.remove();
+                if (!document.querySelector('#partsCatsTable tbody tr')) {
+                    document.querySelector('#partsCatsTable tbody').innerHTML =
+                        '<tr id="pc-empty"><td colspan="3" class="text-center text-muted py-3">Nessuna categoria</td></tr>';
+                }
+            }, function(err) {
+                showConfirmModal(err, null, {title:'Errore', hideOk:true});
+            });
+        }, {title:'Elimina Categoria', btnClass:'btn-danger', btnText:'Elimina'});
+    });
+
+    // ── CUSTOM FIELDS ──────────────────────────────────────────────────────
+
+    var CF_TYPE_LABELS = {
+        text:'Testo', textarea:'Testo lungo', number:'Numero',
+        date:'Data', select:'Selezione', checkbox:'Checkbox'
+    };
+
+    function renderCfRow(f) {
+        var optionsBadge = f.field_type === 'select' ? '<span class="badge bg-info ms-1" title="' + escHtml(f.field_options||'') + '">opts</span>' : '';
+        return '<tr id="cf-row-' + f.id + '">' +
+            '<td class="fw-semibold">' + escHtml(f.field_label) + (f.is_required=='1'?'<span class="text-danger ms-1" title="Obbligatorio">*</span>':'') + '</td>' +
+            '<td class="small font-monospace text-muted">' + escHtml(f.field_name) + '</td>' +
+            '<td><span class="badge bg-secondary">' + escHtml(CF_TYPE_LABELS[f.field_type]||f.field_type) + '</span>' + optionsBadge + '</td>' +
+            '<td>' + (f.is_required=='1'?'<i class="bi bi-check-circle-fill text-success"></i>':'<i class="bi bi-dash text-muted"></i>') + '</td>' +
+            '<td class="small">' + escHtml(f.sort_order) + '</td>' +
+            '<td>' + (f.active=='1'?'<span class="badge bg-success">Attivo</span>':'<span class="badge bg-secondary">Inattivo</span>') + '</td>' +
+            '<td><div class="btn-group btn-group-sm">' +
+            '<button class="btn btn-outline-secondary cf-edit" data-id="' + f.id + '" title="Modifica"><i class="bi bi-pencil"></i></button>' +
+            '<button class="btn btn-outline-danger cf-delete" data-id="' + f.id + '" data-label="' + escHtml(f.field_label) + '" title="Elimina"><i class="bi bi-trash"></i></button>' +
+            '</div></td></tr>';
+    }
+
+    var cfCache = {};
+
+    function loadCustomFields() {
+        $.ajax({
+            url: apiUrl + '?action=list_custom_fields',
+            dataType: 'json',
+            success: function(r) {
+                var tbody = document.getElementById('cfTbody');
+                if (!r.success) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-3">Errore caricamento dati.</td></tr>'; return; }
+                cfCache = {};
+                if (!r.data || r.data.length === 0) {
+                    tbody.innerHTML = '<tr id="cf-empty"><td colspan="7" class="text-center text-muted py-4"><i class="bi bi-ui-checks fs-2 d-block mb-2 text-muted"></i>Nessun campo personalizzato. Clicca "Aggiungi Campo" per iniziare.</td></tr>';
+                    return;
+                }
+                var html = '';
+                r.data.forEach(function(f) { cfCache[f.id] = f; html += renderCfRow(f); });
+                tbody.innerHTML = html;
+            },
+            error: function() {
+                document.getElementById('cfTbody').innerHTML = '<tr><td colspan="7" class="text-center text-danger py-3">Errore di comunicazione.</td></tr>';
+            }
+        });
+    }
+
+    // Load custom fields when tab is activated
+    document.querySelector('a[href="#tab-custom"]').addEventListener('shown.bs.tab', function() {
+        loadCustomFields();
+    });
+    // Also load if already active
+    if (document.getElementById('tab-custom').classList.contains('show')) {
+        loadCustomFields();
+    }
+
+    // Toggle options textarea visibility on type change
+    document.getElementById('cfAddType').addEventListener('change', function() {
+        document.querySelector('#cfAddModal .cf-options-row').classList.toggle('d-none', this.value !== 'select');
+    });
+    document.getElementById('cfEditType').addEventListener('change', function() {
+        document.querySelector('#cfEditModal .cf-edit-options-row').classList.toggle('d-none', this.value !== 'select');
+    });
+
+    // Add custom field
+    document.getElementById('cfAddSaveBtn').addEventListener('click', function() {
+        hideErr('cfAddError');
+        var label   = document.getElementById('cfAddLabel').value.trim();
+        var type    = document.getElementById('cfAddType').value;
+        var options = document.getElementById('cfAddOptions').value.trim();
+        var sort    = document.getElementById('cfAddSort').value;
+        var req     = document.getElementById('cfAddRequired').checked ? '1' : '0';
+        if (!label) { showErr('cfAddError', 'L\'etichetta è obbligatoria.'); return; }
+        var data = {field_label: label, field_type: type, field_options: options, sort_order: sort};
+        if (req === '1') data.is_required = '1';
+        apiPost('add_custom_field', data, function(r) {
+            var tbody = document.getElementById('cfTbody');
+            var empty = document.getElementById('cf-empty');
+            if (empty) empty.remove();
+            tbody.insertAdjacentHTML('beforeend', renderCfRow(r.field));
+            cfCache[r.field.id] = r.field;
+            document.getElementById('cfAddLabel').value   = '';
+            document.getElementById('cfAddOptions').value = '';
+            document.getElementById('cfAddSort').value    = '0';
+            document.getElementById('cfAddRequired').checked = false;
+            document.getElementById('cfAddType').value = 'text';
+            document.querySelector('#cfAddModal .cf-options-row').classList.add('d-none');
+            bootstrap.Modal.getInstance(document.getElementById('cfAddModal')).hide();
+        }, function(err) { showErr('cfAddError', err); });
+    });
+
+    // Open edit modal
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.cf-edit');
+        if (!btn) return;
+        var id = btn.dataset.id;
+        var f  = cfCache[id];
+        if (!f) return;
+        hideErr('cfEditError');
+        document.getElementById('cfEditId').value    = f.id;
+        document.getElementById('cfEditLabel').value = f.field_label;
+        document.getElementById('cfEditType').value  = f.field_type;
+        document.getElementById('cfEditSort').value  = f.sort_order;
+        document.getElementById('cfEditRequired').checked = f.is_required == '1';
+        document.getElementById('cfEditActive').checked   = f.active == '1';
+        // Options
+        var optRow = document.querySelector('#cfEditModal .cf-edit-options-row');
+        if (f.field_type === 'select') {
+            optRow.classList.remove('d-none');
+            var opts = [];
+            try { opts = JSON.parse(f.field_options || '[]'); } catch(ex) {}
+            document.getElementById('cfEditOptions').value = opts.join('\n');
+        } else {
+            optRow.classList.add('d-none');
+            document.getElementById('cfEditOptions').value = '';
+        }
+        (bootstrap.Modal.getOrCreateInstance(document.getElementById('cfEditModal'))).show();
+    });
+
+    // Save edit
+    document.getElementById('cfEditSaveBtn').addEventListener('click', function() {
+        hideErr('cfEditError');
+        var id      = document.getElementById('cfEditId').value;
+        var label   = document.getElementById('cfEditLabel').value.trim();
+        var type    = document.getElementById('cfEditType').value;
+        var options = document.getElementById('cfEditOptions').value.trim();
+        var sort    = document.getElementById('cfEditSort').value;
+        var req     = document.getElementById('cfEditRequired').checked;
+        var active  = document.getElementById('cfEditActive').checked;
+        if (!label) { showErr('cfEditError', 'L\'etichetta è obbligatoria.'); return; }
+        var data = {id: id, field_label: label, field_type: type, field_options: options, sort_order: sort};
+        if (req)    data.is_required = '1';
+        if (active) data.active      = '1';
+        apiPost('edit_custom_field', data, function(r) {
+            var row = document.getElementById('cf-row-' + r.field.id);
+            if (row) {
+                var newRow = document.createElement('tr');
+                newRow.outerHTML; // placeholder
+                var tmp = document.createElement('tbody');
+                tmp.innerHTML = renderCfRow(r.field);
+                row.replaceWith(tmp.firstElementChild);
+            }
+            cfCache[r.field.id] = r.field;
+            bootstrap.Modal.getInstance(document.getElementById('cfEditModal')).hide();
+        }, function(err) { showErr('cfEditError', err); });
+    });
+
+    // Delete custom field
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.cf-delete');
+        if (!btn) return;
+        showConfirmModal('Eliminare il campo "' + btn.dataset.label + '"?', function() {
+            apiPost('delete_custom_field', {id: btn.dataset.id}, function() {
+                var row = document.getElementById('cf-row-' + btn.dataset.id);
+                if (row) { delete cfCache[btn.dataset.id]; row.remove(); }
+                if (!document.querySelector('#cfTbody tr')) {
+                    document.getElementById('cfTbody').innerHTML =
+                        '<tr id="cf-empty"><td colspan="7" class="text-center text-muted py-4"><i class="bi bi-ui-checks fs-2 d-block mb-2 text-muted"></i>Nessun campo personalizzato.</td></tr>';
+                }
+            }, function(err) {
+                showConfirmModal(err, null, {title:'Errore', hideOk:true});
+            });
+        }, {title:'Elimina Campo', btnClass:'btn-danger', btnText:'Elimina'});
+    });
+
+}());
 </script>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>

@@ -42,7 +42,9 @@ include APP_ROOT . '/includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-people me-2 text-primary"></i>Gestione Utenti</h4>
-    <a href="<?= APP_URL ?>/modules/users/create.php" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Nuovo Utente</a>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#quickCreateUserModal">
+        <i class="bi bi-person-plus me-1"></i>Nuovo Utente
+    </button>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -121,3 +123,122 @@ include APP_ROOT . '/includes/header.php';
 <style>.user-avatar-sm{width:32px;height:32px;font-size:.85rem;line-height:32px;border-radius:50%;background:var(--bs-primary);color:#fff;text-align:center;display:inline-block;flex-shrink:0;}</style>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
+
+<!-- Quick Create User Modal -->
+<div class="modal fade" id="quickCreateUserModal" tabindex="-1" aria-labelledby="quickCreateUserLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold" id="quickCreateUserLabel">
+                    <i class="bi bi-person-plus text-primary me-2"></i>Nuovo Utente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="qcUserError" class="alert alert-danger d-none"></div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Nome Completo <span class="text-danger">*</span></label>
+                        <input type="text" id="qcUserFullName" class="form-control" placeholder="Mario Rossi">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Ruolo</label>
+                        <select id="qcUserRole" class="form-select">
+                            <option value="user">Utente</option>
+                            <option value="technician">Tecnico</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Username <span class="text-danger">*</span></label>
+                        <input type="text" id="qcUserUsername" class="form-control font-monospace" placeholder="m.rossi">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+                        <input type="email" id="qcUserEmail" class="form-control" placeholder="mario@esempio.it">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Password <span class="text-danger">*</span></label>
+                        <input type="password" id="qcUserPassword" class="form-control" placeholder="Minimo 6 caratteri">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Conferma Password <span class="text-danger">*</span></label>
+                        <input type="password" id="qcUserPassword2" class="form-control" placeholder="Ripeti password">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Annulla
+                </button>
+                <a href="<?= APP_URL ?>/modules/users/create.php" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-up-right me-1"></i>Form completo
+                </a>
+                <button type="button" class="btn btn-primary" id="qcUserSaveBtn">
+                    <i class="bi bi-check-lg me-1"></i>Crea Utente
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var saveBtn = document.getElementById('qcUserSaveBtn');
+    if (!saveBtn) return;
+    saveBtn.addEventListener('click', function() {
+        var errorEl = document.getElementById('qcUserError');
+        errorEl.classList.add('d-none');
+        var fullName  = document.getElementById('qcUserFullName').value.trim();
+        var username  = document.getElementById('qcUserUsername').value.trim();
+        var email     = document.getElementById('qcUserEmail').value.trim();
+        var role      = document.getElementById('qcUserRole').value;
+        var password  = document.getElementById('qcUserPassword').value;
+        var password2 = document.getElementById('qcUserPassword2').value;
+        if (!fullName || !username || !email || !password) {
+            errorEl.textContent = 'Tutti i campi obbligatori devono essere compilati.';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+        if (password.length < 6) {
+            errorEl.textContent = 'La password deve essere di almeno 6 caratteri.';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+        if (password !== password2) {
+            errorEl.textContent = 'Le password non corrispondono.';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creazione...';
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var data = new FormData();
+        data.append('action', 'create');
+        data.append('csrf_token', csrfMeta ? csrfMeta.content : '');
+        data.append('full_name', fullName);
+        data.append('username', username);
+        data.append('email', email);
+        data.append('role', role);
+        data.append('password', password);
+        fetch('<?= APP_URL ?>/api/users.php', { method: 'POST', body: data })
+            .then(function(r){ return r.json(); })
+            .then(function(resp) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Crea Utente';
+                if (resp.success) {
+                    window.location.reload();
+                } else {
+                    errorEl.textContent = resp.error || 'Errore durante la creazione.';
+                    errorEl.classList.remove('d-none');
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Crea Utente';
+                errorEl.textContent = 'Errore di comunicazione con il server.';
+                errorEl.classList.remove('d-none');
+            });
+    });
+}());
+</script>

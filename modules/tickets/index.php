@@ -126,8 +126,12 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
     <div class="d-flex gap-2">
         <?php if (isTechnician()): ?>
         <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'csv'])) ?>" class="btn btn-outline-success btn-sm"><i class="bi bi-download me-1"></i>Esporta CSV</a>
-        <?php endif; ?>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#quickCreateTicketModal">
+            <i class="bi bi-plus-lg me-1"></i>Nuovo Ticket
+        </button>
+        <?php else: ?>
         <a href="<?= APP_URL ?>/modules/tickets/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuovo Ticket</a>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -375,6 +379,84 @@ $activeTab      = $_GET['qtab'] ?? 'all';
         </div>
     </div>
 </div>
+
+<!-- ============================================================
+     Quick Create Ticket Modal
+     ============================================================ -->
+<div class="modal fade" id="quickCreateTicketModal" tabindex="-1" aria-labelledby="quickCreateTicketLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold" id="quickCreateTicketLabel">
+                    <i class="bi bi-plus-circle text-primary me-2"></i>Crea Nuovo Ticket
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <div id="qcTicketError" class="alert alert-danger d-none"></div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Titolo <span class="text-danger">*</span></label>
+                        <input type="text" id="qcTitle" class="form-control" placeholder="Descrizione breve del problema">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Descrizione <span class="text-danger">*</span></label>
+                        <textarea id="qcDescription" class="form-control" rows="4" placeholder="Descrizione dettagliata..."></textarea>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Priorità</label>
+                        <select id="qcPriority" class="form-select">
+                            <option value="low">Bassa</option>
+                            <option value="medium" selected>Media</option>
+                            <option value="high">Alta</option>
+                            <option value="urgent">Urgente</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Categoria</label>
+                        <select id="qcCategory" class="form-select">
+                            <option value="">— Nessuna —</option>
+                            <?php foreach ($categories as $cat): ?>
+                            <option value="<?= $cat['id'] ?>"><?= h($cat['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Assegna a</label>
+                        <select id="qcAssignee" class="form-select">
+                            <option value="">— Non assegnato —</option>
+                            <?php foreach ($technicians as $tech): ?>
+                            <option value="<?= $tech['id'] ?>"><?= h($tech['full_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php if ($dealers): ?>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Concessionario</label>
+                        <select id="qcDealer" class="form-select">
+                            <option value="">— Nessuno —</option>
+                            <?php foreach ($dealers as $dlr): ?>
+                            <option value="<?= $dlr['id'] ?>"><?= h($dlr['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Annulla
+                </button>
+                <a href="<?= APP_URL ?>/modules/tickets/create.php" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-up-right me-1"></i>Form completo
+                </a>
+                <button type="button" class="btn btn-primary" id="qcTicketSaveBtn">
+                    <i class="bi bi-check-lg me-1"></i>Crea Ticket
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <script>
@@ -410,4 +492,54 @@ document.querySelectorAll('.quick-status-change').forEach(function(el) {
             .catch(function() { alert('Errore di comunicazione.'); });
     });
 });
+
+// ── Quick Create Ticket ────────────────────────────────────────────────────
+(function() {
+    var saveBtn = document.getElementById('qcTicketSaveBtn');
+    if (!saveBtn) return;
+    saveBtn.addEventListener('click', function() {
+        var errorEl = document.getElementById('qcTicketError');
+        errorEl.classList.add('d-none');
+        var title  = document.getElementById('qcTitle').value.trim();
+        var desc   = document.getElementById('qcDescription').value.trim();
+        if (!title || !desc) {
+            errorEl.textContent = 'Titolo e descrizione sono obbligatori.';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creazione...';
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var data = new FormData();
+        data.append('action', 'create');
+        data.append('csrf_token', csrfMeta ? csrfMeta.content : '');
+        data.append('title', title);
+        data.append('description', desc);
+        data.append('priority', document.getElementById('qcPriority').value);
+        data.append('category_id', document.getElementById('qcCategory').value);
+        data.append('assigned_to', document.getElementById('qcAssignee').value);
+        var dealerEl = document.getElementById('qcDealer');
+        if (dealerEl) data.append('dealer_id', dealerEl.value);
+        fetch(window.appUrl + '/api/tickets.php', { method: 'POST', body: data })
+            .then(function(r){ return r.json(); })
+            .then(function(resp) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Crea Ticket';
+                if (resp.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('quickCreateTicketModal')).hide();
+                    window.location.href = window.appUrl + '/modules/tickets/view.php?id=' + resp.id;
+                } else {
+                    errorEl.textContent = resp.error || 'Errore durante la creazione.';
+                    errorEl.classList.remove('d-none');
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Crea Ticket';
+                errorEl.textContent = 'Errore di comunicazione con il server.';
+                errorEl.classList.remove('d-none');
+            });
+    });
+}());
 </script>

@@ -32,7 +32,11 @@ include APP_ROOT . '/includes/header.php';
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-shop me-2 text-primary"></i>Concessionari</h4>
     <?php if (isAdmin()): ?>
-    <a href="<?= APP_URL ?>/modules/dealers/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuovo Concessionario</a>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#quickCreateDealerModal">
+            <i class="bi bi-plus-lg me-1"></i>Nuovo Concessionario
+        </button>
+    </div>
     <?php endif; ?>
 </div>
 
@@ -104,3 +108,107 @@ include APP_ROOT . '/includes/header.php';
 </div>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
+
+<?php if (isAdmin()): ?>
+<!-- Quick Create Dealer Modal -->
+<div class="modal fade" id="quickCreateDealerModal" tabindex="-1" aria-labelledby="quickCreateDealerLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold" id="quickCreateDealerLabel">
+                    <i class="bi bi-shop text-primary me-2"></i>Nuovo Concessionario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="qcDealerError" class="alert alert-danger d-none"></div>
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                        <input type="text" id="qcDealerName" class="form-control" placeholder="Nome concessionario">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Codice <span class="text-danger">*</span></label>
+                        <input type="text" id="qcDealerCode" class="form-control font-monospace" placeholder="COD001">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Email</label>
+                        <input type="email" id="qcDealerEmail" class="form-control" placeholder="email@esempio.it">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Telefono</label>
+                        <input type="text" id="qcDealerPhone" class="form-control" placeholder="+39 02 000000">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Indirizzo</label>
+                        <input type="text" id="qcDealerAddress" class="form-control" placeholder="Via...">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Città</label>
+                        <input type="text" id="qcDealerCity" class="form-control" placeholder="Milano">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Annulla
+                </button>
+                <a href="<?= APP_URL ?>/modules/dealers/create.php" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-up-right me-1"></i>Form completo
+                </a>
+                <button type="button" class="btn btn-primary" id="qcDealerSaveBtn">
+                    <i class="bi bi-check-lg me-1"></i>Crea Concessionario
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var saveBtn = document.getElementById('qcDealerSaveBtn');
+    if (!saveBtn) return;
+    saveBtn.addEventListener('click', function() {
+        var errorEl = document.getElementById('qcDealerError');
+        errorEl.classList.add('d-none');
+        var name = document.getElementById('qcDealerName').value.trim();
+        var code = document.getElementById('qcDealerCode').value.trim();
+        if (!name || !code) {
+            errorEl.textContent = 'Nome e codice sono obbligatori.';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creazione...';
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var data = new FormData();
+        data.append('action', 'create');
+        data.append('csrf_token', csrfMeta ? csrfMeta.content : '');
+        data.append('name', name);
+        data.append('code', code);
+        data.append('email', document.getElementById('qcDealerEmail').value.trim());
+        data.append('phone', document.getElementById('qcDealerPhone').value.trim());
+        data.append('address', document.getElementById('qcDealerAddress').value.trim());
+        data.append('city', document.getElementById('qcDealerCity').value.trim());
+        fetch('<?= APP_URL ?>/api/dealers.php', { method: 'POST', body: data })
+            .then(function(r){ return r.json(); })
+            .then(function(resp) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Crea Concessionario';
+                if (resp.success) {
+                    window.location.href = '<?= APP_URL ?>/modules/dealers/view.php?id=' + resp.id;
+                } else {
+                    errorEl.textContent = resp.error || 'Errore durante la creazione.';
+                    errorEl.classList.remove('d-none');
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Crea Concessionario';
+                errorEl.textContent = 'Errore di comunicazione con il server.';
+                errorEl.classList.remove('d-none');
+            });
+    });
+}());
+</script>
+<?php endif; ?>
