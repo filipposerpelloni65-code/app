@@ -42,6 +42,9 @@ try {
         "CREATE TABLE IF NOT EXISTS dealer_users (dealer_id INT NOT NULL, location_id INT, user_id INT NOT NULL, PRIMARY KEY (dealer_id, user_id), FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
         "CREATE TABLE IF NOT EXISTS rapportini (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, work_description TEXT NOT NULL, parts_used TEXT, notes TEXT, intervention_date DATE NOT NULL, technician_id INT NOT NULL, ticket_id INT NULL, dealer_id INT NULL, location_id INT NULL, periferica_id INT NULL, customer_name VARCHAR(100), customer_contact VARCHAR(100), status ENUM('draft','signed','archived') NOT NULL DEFAULT 'draft', signature_data MEDIUMTEXT, signed_by_name VARCHAR(100), signed_at TIMESTAMP NULL, created_by INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY (technician_id) REFERENCES users(id), FOREIGN KEY (created_by) REFERENCES users(id))",
         "CREATE TABLE IF NOT EXISTS periferiche_guaste (id INT AUTO_INCREMENT PRIMARY KEY, codice VARCHAR(30) NOT NULL UNIQUE, tipo VARCHAR(100) NOT NULL, marca VARCHAR(100), modello VARCHAR(100), seriale VARCHAR(100), descrizione_guasto TEXT, dealer_id INT NULL, location_id INT NULL, ticket_id INT NULL, tecnico_ritiro_id INT NULL, data_ritiro DATE NOT NULL, stato ENUM('in_giacenza','in_diagnosi','in_riparazione','riparata','non_riparabile','restituita','rottamata') NOT NULL DEFAULT 'in_giacenza', note_diagnosi TEXT, note_interne TEXT, rapportino_id INT NULL, created_by INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY (tecnico_ritiro_id) REFERENCES users(id), FOREIGN KEY (created_by) REFERENCES users(id))",
+        "CREATE TABLE IF NOT EXISTS spedizioni (id INT AUTO_INCREMENT PRIMARY KEY, tracking_number VARCHAR(100) NULL, corriere VARCHAR(100) NULL, status ENUM('da_spedire','spedita','consegnata','annullata') NOT NULL DEFAULT 'da_spedire', ticket_id INT NULL, spare_parts_request_id INT NULL, dealer_id INT NULL, location_id INT NULL, note TEXT NULL, data_spedizione DATE NULL, data_consegna_prevista DATE NULL, created_by INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE SET NULL, FOREIGN KEY (spare_parts_request_id) REFERENCES spare_parts_requests(id) ON DELETE SET NULL, FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL, FOREIGN KEY (created_by) REFERENCES users(id))",
+        "CREATE TABLE IF NOT EXISTS modelli_componenti (id INT AUTO_INCREMENT PRIMARY KEY, tipo ENUM('periferica','accessorio','cavo') NOT NULL, nome VARCHAR(255) NOT NULL, marca VARCHAR(100), descrizione TEXT, active TINYINT(1) NOT NULL DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
+        "CREATE TABLE IF NOT EXISTS ticket_componenti (id INT AUTO_INCREMENT PRIMARY KEY, ticket_id INT NOT NULL, modello_id INT NOT NULL, tipo ENUM('periferica','accessorio','cavo') NOT NULL, seriale_nuovo VARCHAR(100) NULL, quantita INT NOT NULL DEFAULT 1, note TEXT, created_by INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE, FOREIGN KEY (modello_id) REFERENCES modelli_componenti(id), FOREIGN KEY (created_by) REFERENCES users(id))",
         "CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, type VARCHAR(50) NOT NULL DEFAULT 'info', title VARCHAR(255) NOT NULL, message TEXT, entity_type VARCHAR(50) DEFAULT NULL, entity_id INT DEFAULT NULL, url VARCHAR(500) DEFAULT NULL, is_read TINYINT(1) NOT NULL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, INDEX idx_notif_user_read (user_id, is_read), INDEX idx_notif_created (created_at))"
     ];
 
@@ -81,17 +84,19 @@ try {
         ('Concessionari','dealers','Gestione concessionari e punti vendita','1.0.0',1,'bi-shop',3),
         ('Rapportini','rapportini','Rapportini di lavoro con firma digitale e PDF','1.0.0',1,'bi-file-earmark-text',4),
         ('Periferiche','periferiche','Gestione periferiche guaste e flusso riparazione','1.0.0',1,'bi-hdd-network',5),
-        ('Utenti','users','Gestione utenti del sistema','1.0.0',1,'bi-people',6),
-        ('Report','reports','Report e statistiche','1.0.0',1,'bi-bar-chart',7),
-        ('Impostazioni','settings','Configurazione sistema','1.0.0',1,'bi-gear',8),
-        ('Notifiche','notifications','Centro notifiche in tempo reale','1.0.0',1,'bi-bell',9)");
+        ('Spedizioni','spedizioni','Gestione spedizioni ricambi e materiali','1.0.0',1,'bi-truck',6),
+        ('Componenti','componenti','Catalogo modelli periferiche, accessori e cavi','1.0.0',1,'bi-cpu',7),
+        ('Utenti','users','Gestione utenti del sistema','1.0.0',1,'bi-people',8),
+        ('Report','reports','Report e statistiche','1.0.0',1,'bi-bar-chart',9),
+        ('Impostazioni','settings','Configurazione sistema','1.0.0',1,'bi-gear',10),
+        ('Notifiche','notifications','Centro notifiche in tempo reale','1.0.0',1,'bi-bell',11)");
 
     $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES
         ('company_name','" . addslashes($companyName) . "'),
         ('ticket_prefix','TKT'),('items_per_page','25'),
         ('email_notifications','0'),('smtp_host',''),
-        ('smtp_port','587'),('smtp_user',''),('smtp_pass','')");
-
+        ('smtp_port','587'),('smtp_user',''),('smtp_pass',''),
+        ('auto_close_days','0'),('auto_close_secret',''),('auto_assign','0')");
     $pdo->exec("INSERT IGNORE INTO ticket_categories (name, description) VALUES
         ('Hardware','Problemi hardware'),('Software','Problemi software'),
         ('Rete','Problemi di rete'),('Altro','Altro')");

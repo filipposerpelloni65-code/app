@@ -112,6 +112,7 @@ include APP_ROOT . '/includes/header.php';
                         <td class="small text-muted"><?= formatDate($r['created_at'], 'd/m/Y') ?></td>
                         <?php if (isAdmin()): ?>
                         <td>
+                            <div class="d-flex gap-1 align-items-center">
                             <form method="post" class="d-inline">
                                 <?= csrfField() ?>
                                 <input type="hidden" name="request_id" value="<?= $r['id'] ?>">
@@ -122,6 +123,10 @@ include APP_ROOT . '/includes/header.php';
                                     <option value="fulfilled" <?= $r['status']==='fulfilled'?'selected':'' ?>>Evasa</option>
                                 </select>
                             </form>
+                            <?php if (isModuleEnabled('spedizioni') && $r['status'] === 'approved'): ?>
+                            <a href="<?= APP_URL ?>/modules/spedizioni/create.php?request_id=<?= $r['id'] ?>" class="btn btn-sm btn-outline-primary" title="Crea Spedizione"><i class="bi bi-truck"></i></a>
+                            <?php endif; ?>
+                            </div>
                         </td>
                         <?php endif; ?>
                     </tr>

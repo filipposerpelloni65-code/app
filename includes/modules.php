@@ -35,14 +35,16 @@ function getAllModules(): array {
 
 function getModuleUrl(string $slug): string {
     $urls = [
-        'tickets' => APP_URL . '/modules/tickets/index.php',
+        'tickets'     => APP_URL . '/modules/tickets/index.php',
         'spare_parts' => APP_URL . '/modules/spare_parts/index.php',
-        'dealers' => APP_URL . '/modules/dealers/index.php',
-        'users' => APP_URL . '/modules/users/index.php',
-        'reports' => APP_URL . '/modules/reports/index.php',
-        'settings' => APP_URL . '/modules/settings/index.php',
-        'rapportini' => APP_URL . '/modules/rapportini/index.php',
+        'dealers'     => APP_URL . '/modules/dealers/index.php',
+        'users'       => APP_URL . '/modules/users/index.php',
+        'reports'     => APP_URL . '/modules/reports/index.php',
+        'settings'    => APP_URL . '/modules/settings/index.php',
+        'rapportini'  => APP_URL . '/modules/rapportini/index.php',
         'periferiche' => APP_URL . '/modules/periferiche/index.php',
+        'spedizioni'  => APP_URL . '/modules/spedizioni/index.php',
+        'componenti'  => APP_URL . '/modules/componenti/index.php',
         'notifications' => APP_URL . '/modules/notifications/index.php',
     ];
     return $urls[$slug] ?? '#';

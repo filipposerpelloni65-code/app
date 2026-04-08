@@ -138,6 +138,43 @@ $(document).ready(function () {
     if ($('.alert-danger').length) {
         $('html, body').animate({ scrollTop: 0 }, 400);
     }
+
+    // Global search
+    var searchTimer;
+    $('#globalSearchInput').on('input', function () {
+        clearTimeout(searchTimer);
+        var q = $(this).val().trim();
+        var $results = $('#searchResults');
+        if (q.length < 2) {
+            $results.hide();
+            return;
+        }
+        searchTimer = setTimeout(function () {
+            $.getJSON(window.appUrl + '/api/search.php', { q: q }, function (data) {
+                $results.empty();
+                if (!data.success || !data.results || !data.results.length) {
+                    $results.append('<div class="p-3 text-muted small">Nessun risultato trovato.</div>');
+                } else {
+                    $.each(data.results, function (i, r) {
+                        var item = $('<a class="dropdown-item py-2 px-3 d-flex align-items-start gap-2" href="' + r.url + '"></a>');
+                        item.append('<i class="bi ' + r.icon + ' mt-1 text-primary flex-shrink-0"></i>');
+                        var info = $('<div class="flex-grow-1 overflow-hidden"></div>');
+                        info.append('<div class="small fw-semibold text-truncate">' + (r.code ? '<span class="font-monospace text-secondary">' + r.code + '</span> — ' : '') + r.label + '</div>');
+                        info.append('<div class="x-small text-muted">' + r.type + (r.meta ? ' &middot; ' + r.meta : '') + '</div>');
+                        item.append(info);
+                        $results.append(item);
+                    });
+                }
+                $results.show();
+            });
+        }, 300);
+    });
+
+    $(document).on('click', function (e) {
+        if (!$(e.target).closest('#globalSearchForm').length) {
+            $('#searchResults').hide();
+        }
+    });
 });
 
 // App URL global (set in PHP pages)

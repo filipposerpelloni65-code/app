@@ -146,6 +146,79 @@ function getPerifericaStatoLabel(string $stato): string {
     return $labels[$stato] ?? $stato;
 }
 
+function getSpedizioneStatusBadge(string $status): string {
+    $badges = [
+        'da_spedire'  => '<span class="badge bg-secondary">Da Spedire</span>',
+        'spedita'     => '<span class="badge bg-primary">Spedita</span>',
+        'consegnata'  => '<span class="badge bg-success">Consegnata</span>',
+        'annullata'   => '<span class="badge bg-danger">Annullata</span>',
+    ];
+    return $badges[$status] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($status) . '</span>';
+}
+
+function getSpedizioneStatusLabel(string $status): string {
+    $labels = [
+        'da_spedire' => 'Da Spedire',
+        'spedita'    => 'Spedita',
+        'consegnata' => 'Consegnata',
+        'annullata'  => 'Annullata',
+    ];
+    return $labels[$status] ?? $status;
+}
+
+function getNotificationCounts(): array {
+    try {
+        $db = getDB();
+        $counts = [
+            'pending_parts'    => (int)$db->query("SELECT COUNT(*) FROM spare_parts_requests WHERE status='pending'")->fetchColumn(),
+            'open_tickets'     => (int)$db->query("SELECT COUNT(*) FROM tickets WHERE status='open'")->fetchColumn(),
+            'da_spedire'       => (int)$db->query("SELECT COUNT(*) FROM spedizioni WHERE status='da_spedire'")->fetchColumn(),
+            'periferiche_wait' => (int)$db->query("SELECT COUNT(*) FROM periferiche_guaste WHERE stato IN ('in_giacenza','in_diagnosi')")->fetchColumn(),
+        ];
+        return $counts;
+    } catch (Exception $e) {
+        return ['pending_parts' => 0, 'open_tickets' => 0, 'da_spedire' => 0, 'periferiche_wait' => 0];
+    }
+}
+
+function getAutoAssignee(): ?int {
+    try {
+        $db = getDB();
+        // Round-robin: pick the technician with fewest open tickets
+        $stmt = $db->query("
+            SELECT u.id, COUNT(t.id) AS open_count
+            FROM users u
+            LEFT JOIN tickets t ON t.assigned_to = u.id AND t.status NOT IN ('resolved','closed')
+            WHERE u.role IN ('admin','technician') AND u.active = 1
+            GROUP BY u.id
+            ORDER BY open_count ASC, u.id ASC
+            LIMIT 1
+        ");
+        $row = $stmt->fetch();
+        return $row ? (int)$row['id'] : null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+function getComponenteTipoBadge(string $tipo): string {
+    $badges = [
+        'periferica' => '<span class="badge bg-primary">Periferica</span>',
+        'accessorio' => '<span class="badge bg-info text-dark">Accessorio</span>',
+        'cavo'       => '<span class="badge bg-secondary">Cavo</span>',
+    ];
+    return $badges[$tipo] ?? '<span class="badge bg-light text-dark">' . htmlspecialchars($tipo) . '</span>';
+}
+
+function getComponenteTipoLabel(string $tipo): string {
+    $labels = [
+        'periferica' => 'Periferica',
+        'accessorio' => 'Accessorio',
+        'cavo'       => 'Cavo',
+    ];
+    return $labels[$tipo] ?? $tipo;
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 function createNotification(int $userId, string $type, string $title, string $message = '', string $entityType = '', int $entityId = 0, string $url = ''): void {
