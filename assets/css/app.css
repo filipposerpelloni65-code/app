@@ -1063,12 +1063,15 @@ body.sidebar-collapsed .sidebar .user-avatar {
 .gap-1   { gap: 0.25rem !important; }
 .gap-2   { gap: 0.5rem !important; }
 
-/* Smooth page transitions
-   Use 'backwards' fill-mode so that after the animation completes the
-   element reverts to its natural styles (no leftover transform).
-   A persistent transform would create a new stacking context and push
-   Bootstrap modals/backdrops out of order, making modals appear
-   transparent and the page unresponsive. */
+/* ── Smooth page transitions ──────────────────────────────────────────────────
+   'backwards' fill-mode means: apply the `from` keyframe during any
+   animation-delay. Crucially, it does NOT set `animation-fill-mode: forwards`,
+   so after the animation ends the element reverts to its natural stylesheet
+   styles (no leftover transform). The old value 'both' was equivalent to
+   'forwards | backwards', which kept transform:translateY(0) alive permanently
+   after completion, creating a stacking context that trapped Bootstrap modals.
+   The JS cleanup in app.js removes inline transform styles as a secondary
+   guard for the stagger animations on cards and table rows. */
 .container-fluid {
     animation: fadeIn 0.3s ease backwards;
 }
@@ -1130,3 +1133,43 @@ body.sidebar-collapsed .sidebar .user-avatar {
     font-size: 0.72rem;
 }
 
+/* ── Activity Log ─────────────────────────────────────────────────────────── */
+.activity-log-item { transition: background-color 0.15s ease; }
+.activity-log-item:hover { background-color: var(--surface-hover); }
+.activity-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* ── Activity Timeline (Dashboard) ────────────────────────────────────────── */
+.activity-timeline { font-size: 0.875rem; }
+
+/* ── Profile page ─────────────────────────────────────────────────────────── */
+.auto-dismiss { /* auto-fade handled by Bootstrap alert-dismissible */ }
+.form-section-title {
+    display: block;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 0.5rem;
+}
+
+/* ── Ticket quick-filter tabs ─────────────────────────────────────────────── */
+.nav-pills .nav-link {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    border-radius: 20px;
+}
+.nav-pills .nav-link.active {
+    background-color: var(--brand-primary);
+}
+.nav-pills .nav-link:hover:not(.active) {
+    background-color: var(--surface-hover);
+}
+
+/* ── Resolution rate ring ─────────────────────────────────────────────────── */
+/* SVG ring drawn inline; styles here just in case needed */
+
+/* ── Success-subtle / danger-subtle (Bootstrap 5.3 compat) ───────────────── */
+.bg-success-subtle { background-color: rgba(25,135,84,.15) !important; }
+.bg-danger-subtle  { background-color: rgba(220,53,69,.15)  !important; }
+.text-success { color: #198754 !important; }

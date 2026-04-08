@@ -56,6 +56,22 @@ $dashTechnicians = isTechnician()
     ? $db->query("SELECT id, full_name FROM users WHERE role IN ('admin','technician') AND active=1 ORDER BY full_name")->fetchAll()
     : [];
 
+// Resolution rate
+$totalAll     = (int)$db->query("SELECT COUNT(*) FROM tickets")->fetchColumn();
+$totalResolved = (int)$db->query("SELECT COUNT(*) FROM tickets WHERE status IN ('resolved','closed')")->fetchColumn();
+$resolutionRate = $totalAll > 0 ? round($totalResolved / $totalAll * 100) : 0;
+
+// Weekly trend (this week vs last week)
+$thisWeek = (int)$db->query("SELECT COUNT(*) FROM tickets WHERE created_at >= DATE(NOW()) - INTERVAL WEEKDAY(NOW()) DAY")->fetchColumn();
+$lastWeek = (int)$db->query("SELECT COUNT(*) FROM tickets WHERE created_at >= DATE(NOW()) - INTERVAL (7 + WEEKDAY(NOW())) DAY AND created_at < DATE(NOW()) - INTERVAL WEEKDAY(NOW()) DAY")->fetchColumn();
+
+// Recent activity feed (last 12 entries)
+$recentActivity = [];
+try {
+    $actStmt = $db->query("SELECT al.*, u.full_name FROM activity_log al LEFT JOIN users u ON al.user_id=u.id ORDER BY al.created_at DESC LIMIT 12");
+    $recentActivity = $actStmt->fetchAll();
+} catch (Exception $e) { /* silent */ }
+
 include APP_ROOT . '/includes/header.php';
 ?>
 
@@ -223,6 +239,36 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
     </div>
 
     <div class="col-lg-4">
+        <!-- Resolution rate card -->
+        <?php if ($totalAll > 0): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2 text-success"></i>Tasso di Risoluzione</h5>
+            </div>
+            <div class="card-body text-center py-3">
+                <div class="position-relative d-inline-flex align-items-center justify-content-center mb-2" style="width:96px;height:96px">
+                    <svg width="96" height="96" viewBox="0 0 96 96" class="position-absolute top-0 start-0">
+                        <circle cx="48" cy="48" r="42" fill="none" stroke="#e9ecef" stroke-width="10"/>
+                        <circle cx="48" cy="48" r="42" fill="none" stroke="#198754" stroke-width="10"
+                            stroke-dasharray="<?= round(2 * M_PI * 42 * $resolutionRate / 100, 1) ?> 264"
+                            stroke-dashoffset="66" stroke-linecap="round"/>
+                    </svg>
+                    <span class="fs-4 fw-bold text-success"><?= $resolutionRate ?>%</span>
+                </div>
+                <div class="text-muted small"><?= $totalResolved ?> risolti su <?= $totalAll ?> totali</div>
+                <?php if ($lastWeek > 0): ?>
+                <div class="mt-2 small">
+                    <?php $trend = $thisWeek - $lastWeek; ?>
+                    <span class="badge bg-<?= $trend >= 0 ? 'success' : 'danger' ?>-subtle text-<?= $trend >= 0 ? 'success' : 'danger' ?>">
+                        <i class="bi bi-<?= $trend >= 0 ? 'arrow-up' : 'arrow-down' ?>"></i>
+                        <?= abs($trend) ?> questa settimana <?= $trend >= 0 ? '↑' : '↓' ?> vs settimana scorsa
+                    </span>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if ($myTickets): ?>
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white">
@@ -243,7 +289,7 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
         <?php endif; ?>
 
         <?php if ($lowStock): ?>
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Scorte Basse</h5>
             </div>
@@ -266,7 +312,52 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
     </div>
 </div>
 
-<!-- ============================================================
+<!-- Activity Feed (full width, admin/technician only) -->
+<?php if ($recentActivity && isTechnician()): ?>
+<div class="row g-4 mt-0">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-activity me-2 text-secondary"></i>Attività Recenti nel Sistema</h5>
+                <?php if (isAdmin()): ?>
+                <a href="<?= APP_URL ?>/modules/activity_log/index.php" class="btn btn-sm btn-outline-secondary">Log completo</a>
+                <?php endif; ?>
+            </div>
+            <div class="card-body p-0">
+                <div class="activity-timeline px-4 py-3">
+                    <?php
+                    $actActionLabels = [
+                        'create' => 'ha creato', 'update' => 'ha modificato', 'delete' => 'ha eliminato',
+                        'comment' => 'ha commentato', 'status_change' => 'ha cambiato stato',
+                        'add_uscita' => 'ha registrato un\'uscita tecnico',
+                        'profile_update' => 'ha aggiornato il profilo', 'password_change' => 'ha cambiato la password',
+                        'login' => 'si è connesso', 'settings_update' => 'ha aggiornato le impostazioni',
+                        'add_componente' => 'ha aggiunto un componente',
+                    ];
+                    $actEntityLabels = ['ticket' => 'ticket', 'user' => 'utente', 'settings' => 'impostazioni'];
+                    foreach ($recentActivity as $i => $act): ?>
+                    <div class="d-flex gap-3 <?= $i < count($recentActivity) - 1 ? 'mb-3' : '' ?>">
+                        <div class="flex-shrink-0 text-muted" style="padding-top:2px">
+                            <i class="bi bi-dot fs-4 lh-1"></i>
+                        </div>
+                        <div class="flex-grow-1 small">
+                            <span class="fw-semibold"><?= h($act['full_name'] ?? 'Sistema') ?></span>
+                            <span class="text-muted"> <?= h($actActionLabels[$act['action']] ?? $act['action']) ?>
+                            <?php if ($act['entity_type']): ?>
+                                <?= h($actEntityLabels[$act['entity_type']] ?? $act['entity_type']) ?>
+                                <?php if ($act['entity_id']): ?><span class="text-primary">#<?= (int)$act['entity_id'] ?></span><?php endif; ?>
+                            <?php endif; ?></span>
+                            <?php if ($act['details']): ?><span class="text-muted"> – <?= h(substr($act['details'], 0, 60)) ?></span><?php endif; ?>
+                        </div>
+                        <div class="flex-shrink-0 text-muted text-nowrap" style="font-size:.75rem"><?= formatDate($act['created_at'], 'd/m H:i') ?></div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
      Quick Create Ticket Modal
      ============================================================ -->
 <div class="modal fade" id="quickCreateTicketModal" tabindex="-1" aria-labelledby="quickCreateTicketModalLabel" aria-hidden="true">

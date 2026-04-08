@@ -88,6 +88,11 @@ if (!empty($_GET['dealer_id'])) { $where[] = 't.dealer_id=?'; $params[] = (int)$
 if (!empty($_GET['location_id'])) { $where[] = 't.location_id=?'; $params[] = (int)$_GET['location_id']; }
 if (!empty($_GET['q'])) { $where[] = '(t.title LIKE ? OR t.description LIKE ?)'; $params[] = '%'.$_GET['q'].'%'; $params[] = '%'.$_GET['q'].'%'; }
 if ($user['role'] === 'user') { $where[] = 't.created_by=?'; $params[] = $user['id']; }
+// Quick tab: unassigned
+if (($_GET['qtab'] ?? '') === 'unassigned') {
+    $where[] = 't.assigned_to IS NULL';
+    $where[] = "t.status NOT IN ('closed','resolved')";
+}
 
 $whereStr = implode(' AND ', $where);
 $total = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE $whereStr");
@@ -116,7 +121,7 @@ include APP_ROOT . '/includes/header.php';
 window.appUrl = <?= json_encode(APP_URL) ?>;
 window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
 </script>
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0"><i class="bi bi-ticket-detailed me-2 text-primary"></i>Gestione Ticket</h4>
     <div class="d-flex gap-2">
         <?php if (isTechnician()): ?>
@@ -125,6 +130,49 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
         <a href="<?= APP_URL ?>/modules/tickets/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuovo Ticket</a>
     </div>
 </div>
+
+<!-- Quick filter tabs (technicians) -->
+<?php if (isTechnician()): ?>
+<?php
+$qTabAll = $totalRows;
+$stMine = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to=?");
+$stMine->execute([$user['id']]);
+$qTabMine = (int)$stMine->fetchColumn();
+$stUnassigned = $db->query("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status NOT IN ('closed','resolved')");
+$qTabUnassigned = (int)$stUnassigned->fetchColumn();
+$stUrgent = $db->query("SELECT COUNT(*) FROM tickets WHERE priority='urgent' AND status NOT IN ('closed','resolved')");
+$qTabUrgent     = (int)$stUrgent->fetchColumn();
+$activeTab      = $_GET['qtab'] ?? 'all';
+?>
+<ul class="nav nav-pills mb-3 gap-1">
+    <li class="nav-item">
+        <a class="nav-link py-1 <?= $activeTab === 'all' ? 'active' : '' ?>"
+           href="<?= APP_URL ?>/modules/tickets/index.php">
+            Tutti <span class="badge ms-1 <?= $activeTab === 'all' ? 'bg-white text-primary' : 'bg-secondary' ?>"><?= $qTabAll ?></span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link py-1 <?= $activeTab === 'mine' ? 'active' : '' ?>"
+           href="<?= APP_URL ?>/modules/tickets/index.php?assigned_to=<?= $user['id'] ?>&qtab=mine">
+            I miei <span class="badge ms-1 <?= $activeTab === 'mine' ? 'bg-white text-primary' : 'bg-secondary' ?>"><?= $qTabMine ?></span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link py-1 <?= $activeTab === 'unassigned' ? 'active' : '' ?>"
+           href="<?= APP_URL ?>/modules/tickets/index.php?qtab=unassigned">
+            Non assegnati <span class="badge ms-1 <?= $activeTab === 'unassigned' ? 'bg-white text-primary' : ($qTabUnassigned > 0 ? 'bg-warning text-dark' : 'bg-secondary') ?>"><?= $qTabUnassigned ?></span>
+        </a>
+    </li>
+    <?php if ($qTabUrgent > 0): ?>
+    <li class="nav-item">
+        <a class="nav-link py-1 <?= $activeTab === 'urgent' ? 'active' : '' ?>"
+           href="<?= APP_URL ?>/modules/tickets/index.php?priority=urgent&qtab=urgent">
+            <i class="bi bi-exclamation-triangle me-1"></i>Urgenti <span class="badge ms-1 bg-danger"><?= $qTabUrgent ?></span>
+        </a>
+    </li>
+    <?php endif; ?>
+</ul>
+<?php endif; ?>
 
 <?php if (isset($_GET['deleted'])): ?>
 <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle me-2"></i>Ticket eliminato con successo. <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>

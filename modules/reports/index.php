@@ -13,20 +13,41 @@ define('BREADCRUMB', ['Dashboard' => APP_URL.'/dashboard.php', 'Report' => '']);
 
 $db = getDB();
 
+// Date range filter
+$dateFrom = trim($_GET['date_from'] ?? '');
+$dateTo   = trim($_GET['date_to'] ?? '');
+$dateWhere  = '1=1';
+$dateParams = [];
+if ($dateFrom) { $dateWhere .= ' AND DATE(created_at) >= ?'; $dateParams[] = $dateFrom; }
+if ($dateTo)   { $dateWhere .= ' AND DATE(created_at) <= ?'; $dateParams[] = $dateTo; }
+
 // Stats by status
-$byStatus = $db->query("SELECT status, COUNT(*) as cnt FROM tickets GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+$byStatus = $db->prepare("SELECT status, COUNT(*) as cnt FROM tickets WHERE $dateWhere GROUP BY status");
+$byStatus->execute($dateParams);
+$byStatus = $byStatus->fetchAll(PDO::FETCH_KEY_PAIR);
 // Stats by priority
-$byPriority = $db->query("SELECT priority, COUNT(*) as cnt FROM tickets GROUP BY priority")->fetchAll(PDO::FETCH_KEY_PAIR);
-// Monthly tickets (last 6 months)
+$byPriority = $db->prepare("SELECT priority, COUNT(*) as cnt FROM tickets WHERE $dateWhere GROUP BY priority");
+$byPriority->execute($dateParams);
+$byPriority = $byPriority->fetchAll(PDO::FETCH_KEY_PAIR);
+// Monthly tickets (last 6 months, respecting date filter only if no from/to set)
 $monthly = $db->query("SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt FROM tickets WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH) GROUP BY month ORDER BY month")->fetchAll();
 // Top assigned technicians
-$topTech = $db->query("SELECT u.full_name, COUNT(t.id) as cnt FROM tickets t JOIN users u ON t.assigned_to=u.id GROUP BY t.assigned_to ORDER BY cnt DESC LIMIT 5")->fetchAll();
+$topTech = $db->prepare("SELECT u.full_name, COUNT(t.id) as cnt FROM tickets t JOIN users u ON t.assigned_to=u.id WHERE $dateWhere GROUP BY t.assigned_to ORDER BY cnt DESC LIMIT 5");
+$topTech->execute($dateParams);
+$topTech = $topTech->fetchAll();
 // Low stock count
 $lowStock = $db->query("SELECT COUNT(*) FROM spare_parts WHERE quantity <= min_quantity")->fetchColumn();
 // Parts requests by status
 $reqStats = $db->query("SELECT status, COUNT(*) as cnt FROM spare_parts_requests GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
 // Average resolution time (resolved/closed tickets)
-$avgTime = $db->query("SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, closed_at)) FROM tickets WHERE closed_at IS NOT NULL")->fetchColumn();
+$avgTimeStmt = $db->prepare("SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, closed_at)) FROM tickets WHERE closed_at IS NOT NULL AND $dateWhere");
+$avgTimeStmt->execute($dateParams);
+$avgTime = $avgTimeStmt->fetchColumn();
+
+// Tickets per dealer (top 8)
+$topDealers = $db->prepare("SELECT d.name, COUNT(t.id) as cnt FROM tickets t JOIN dealers d ON t.dealer_id=d.id WHERE $dateWhere GROUP BY t.dealer_id ORDER BY cnt DESC LIMIT 8");
+$topDealers->execute($dateParams);
+$topDealers = $topDealers->fetchAll();
 
 // Periferiche stats
 $periStats = [];
@@ -64,10 +85,30 @@ if (isset($_GET['export']) && $_GET['export'] === 'tickets_csv') {
 include APP_ROOT . '/includes/header.php';
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h4 class="mb-0"><i class="bi bi-bar-chart me-2 text-primary"></i>Report e Statistiche</h4>
-    <a href="?export=tickets_csv" class="btn btn-outline-success btn-sm"><i class="bi bi-download me-1"></i>Esporta Ticket CSV</a>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        <!-- Date range filter -->
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <div class="input-group input-group-sm" style="width:auto">
+                <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="<?= h($dateFrom) ?>" title="Da data">
+                <span class="input-group-text">→</span>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="<?= h($dateTo) ?>" title="A data">
+                <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-funnel"></i></button>
+                <?php if ($dateFrom || $dateTo): ?>
+                <a href="?" class="btn btn-outline-secondary btn-sm" title="Reset"><i class="bi bi-x-lg"></i></a>
+                <?php endif; ?>
+            </div>
+        </form>
+        <a href="?export=tickets_csv<?= $dateFrom ? '&date_from='.urlencode($dateFrom) : '' ?><?= $dateTo ? '&date_to='.urlencode($dateTo) : '' ?>" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-download me-1"></i>Esporta CSV
+        </a>
+    </div>
 </div>
+<?php if ($dateFrom || $dateTo): ?>
+<div class="alert alert-info alert-sm py-2 mb-3"><i class="bi bi-filter me-1"></i>Filtro attivo: <?= $dateFrom ? 'dal '.date('d/m/Y', strtotime($dateFrom)) : '' ?><?= $dateTo ? ' al '.date('d/m/Y', strtotime($dateTo)) : '' ?></div>
+<?php endif; ?>
 
 <!-- KPI Row -->
 <div class="row g-3 mb-4">
@@ -135,9 +176,14 @@ include APP_ROOT . '/includes/header.php';
                 <?php if ($topTech): ?>
                 <ul class="list-group list-group-flush">
                     <?php foreach ($topTech as $i => $t): ?>
-                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
-                        <span class="small"><span class="badge bg-secondary me-2"><?= $i+1 ?></span><?= h($t['full_name']) ?></span>
-                        <span class="badge bg-primary"><?= $t['cnt'] ?></span>
+                    <li class="list-group-item py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small"><span class="badge bg-secondary me-2"><?= $i+1 ?></span><?= h($t['full_name']) ?></span>
+                            <span class="badge bg-primary"><?= $t['cnt'] ?></span>
+                        </div>
+                        <div class="progress mt-1" style="height:3px">
+                            <div class="progress-bar" style="width:<?= $topTech[0]['cnt'] > 0 ? round($t['cnt'] / $topTech[0]['cnt'] * 100) : 0 ?>%"></div>
+                        </div>
                     </li>
                     <?php endforeach; ?>
                 </ul>
@@ -165,6 +211,19 @@ include APP_ROOT . '/includes/header.php';
         </div>
     </div>
 </div>
+
+<?php if ($topDealers): ?>
+<div class="row g-4 mt-0">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-shop me-2 text-primary"></i>Ticket per Concessionario (Top <?= count($topDealers) ?>)</h6></div>
+            <div class="card-body">
+                <canvas id="dealerChart" height="60"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php if ($periStats || $spedStats): ?>
 <div class="row g-4 mt-0">
@@ -217,6 +276,10 @@ const priorityData = [
     <?= (int)($byPriority['high']??0) ?>,
     <?= (int)($byPriority['urgent']??0) ?>
 ];
+<?php if ($topDealers): ?>
+const dealerLabels = <?= json_encode(array_column($topDealers, 'name')) ?>;
+const dealerData   = <?= json_encode(array_map('intval', array_column($topDealers, 'cnt'))) ?>;
+<?php endif; ?>
 
 document.addEventListener('DOMContentLoaded', function() {
     new Chart(document.getElementById('monthlyChart'), {
@@ -234,6 +297,27 @@ document.addEventListener('DOMContentLoaded', function() {
         data: { labels: priorityLabels, datasets: [{ data: priorityData, backgroundColor: ['#0dcaf0','#6c757d','#ffc107','#dc3545'] }] },
         options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     });
+    <?php if ($topDealers): ?>
+    new Chart(document.getElementById('dealerChart'), {
+        type: 'bar',
+        data: {
+            labels: dealerLabels,
+            datasets: [{
+                label: 'Ticket',
+                data: dealerData,
+                backgroundColor: 'rgba(13,110,253,.6)',
+                borderColor: '#0d6efd',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+    <?php endif; ?>
 });
 </script>
 

@@ -66,6 +66,18 @@ $notifCounts = $currentUser ? getNotificationCounts() : [];
                 </a>
             </li>
             <?php endforeach; ?>
+            <?php if (isAdmin()): ?>
+            <li class="nav-item">
+                <a href="<?= APP_URL ?>/modules/activity_log/index.php" class="nav-link text-white <?= strpos($currentPath, '/activity_log/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-journal-text me-2"></i>Log Attività
+                </a>
+            </li>
+            <?php endif; ?>
+            <li class="nav-item">
+                <a href="<?= APP_URL ?>/modules/profile/index.php" class="nav-link text-white <?= strpos($currentPath, '/profile/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-person-circle me-2"></i>Profilo
+                </a>
+            </li>
         </ul>
         <hr>
         <div class="dropdown">
@@ -74,7 +86,12 @@ $notifCounts = $currentUser ? getNotificationCounts() : [];
                 <strong class="text-truncate" style="max-width:120px"><?= h($currentUser['full_name']) ?></strong>
             </a>
             <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-                <li><span class="dropdown-item-text text-muted small"><?= h($currentUser['email']) ?></span></li>
+                <li><span class="dropdown-item-text text-muted small"><?= h($currentUser['email'] ?? $currentUser['username']) ?></span></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/modules/profile/index.php"><i class="bi bi-person-circle me-2"></i>Il mio profilo</a></li>
+                <?php if (isAdmin()): ?>
+                <li><a class="dropdown-item" href="<?= APP_URL ?>/modules/activity_log/index.php"><i class="bi bi-journal-text me-2"></i>Log Attività</a></li>
+                <?php endif; ?>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="<?= APP_URL ?>/logout.php"><i class="bi bi-box-arrow-right me-2"></i>Esci</a></li>
             </ul>
