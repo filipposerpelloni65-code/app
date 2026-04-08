@@ -85,6 +85,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = 'Impostazioni localizzazione salvate.';
         }
 
+        elseif ($section === 'brt') {
+            $fields = ['brt_user_id','brt_departure_depot','brt_sender_customer_code','brt_freight_type'];
+            saveSettings($db, $fields, $_POST);
+            if (!empty($_POST['brt_password'])) {
+                $v = $_POST['brt_password'];
+                $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?")->execute(['brt_password',$v,$v]);
+            }
+            logActivity($user['id'], 'settings_update', 'settings', 0, 'Impostazioni BRT API aggiornate');
+            $success = 'Impostazioni BRT API salvate.';
+        }
+
         elseif ($section === 'notif_triggers') {
             $checks = ['notif_new_ticket','notif_ticket_assign','notif_ticket_comment','notif_ticket_resolved'];
             saveSettings($db, [], $_POST, $checks);
@@ -156,6 +167,11 @@ $settingDefaults = [
     'notif_ticket_assign'     => '1',
     'notif_ticket_comment'    => '1',
     'notif_ticket_resolved'   => '1',
+    'brt_user_id'             => '',
+    'brt_password'            => '',
+    'brt_departure_depot'     => '0',
+    'brt_sender_customer_code'=> '0',
+    'brt_freight_type'        => 'DAP',
 ];
 foreach ($settingDefaults as $k => $v) {
     if (!isset($settings[$k])) $settings[$k] = $v;
@@ -176,6 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'security'       => 'tab-security',
         'locale'         => 'tab-locale',
         'notif_triggers' => 'tab-notif',
+        'brt'            => 'tab-brt',
         'modules'        => 'tab-modules',
         'add_cat'        => 'tab-cats',
         'del_cat'        => 'tab-cats',
@@ -204,6 +221,7 @@ include APP_ROOT . '/includes/header.php';
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-security'?'active':'' ?>" data-bs-toggle="tab" href="#tab-security"><i class="bi bi-shield-lock me-1"></i>Sicurezza</a></li>
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-locale'?'active':'' ?>" data-bs-toggle="tab" href="#tab-locale"><i class="bi bi-translate me-1"></i>Localizzazione</a></li>
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-notif'?'active':'' ?>" data-bs-toggle="tab" href="#tab-notif"><i class="bi bi-bell me-1"></i>Notifiche</a></li>
+    <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-brt'?'active':'' ?>" data-bs-toggle="tab" href="#tab-brt"><i class="bi bi-truck me-1"></i>BRT API</a></li>
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-modules'?'active':'' ?>" data-bs-toggle="tab" href="#tab-modules"><i class="bi bi-puzzle me-1"></i>Moduli</a></li>
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-cats'?'active':'' ?>" data-bs-toggle="tab" href="#tab-cats"><i class="bi bi-tags me-1"></i>Categorie Ticket</a></li>
     <li class="nav-item"><a class="nav-link <?= $activeTab==='tab-pcats'?'active':'' ?>" data-bs-toggle="tab" href="#tab-pcats"><i class="bi bi-tools me-1"></i>Categorie Ricambi</a></li>
@@ -734,6 +752,55 @@ include APP_ROOT . '/includes/header.php';
                         <tr id="cf-loading"><td colspan="7" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Caricamento...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── TAB: BRT API ──────────────────────────────────────────────────── -->
+    <div class="tab-pane fade <?= $activeTab==='tab-brt'?'show active':'' ?>" id="tab-brt">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>BRT REST API — Credenziali</h6>
+                <small class="text-muted">Configurare i dati forniti da BRT per l'integrazione spedizioni.</small>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <?= csrfField() ?><input type="hidden" name="section" value="brt">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">User ID</label>
+                            <input type="text" name="brt_user_id" class="form-control font-monospace" value="<?= h($settings['brt_user_id'] ?? '') ?>" placeholder="Es. 1020101">
+                            <small class="text-muted">Codice utente fornito da BRT (campo <code>userID</code>).</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Password</label>
+                            <input type="password" name="brt_password" class="form-control font-monospace" value="" placeholder="Lascia vuoto per non modificare" autocomplete="new-password">
+                            <small class="text-muted">Lascia vuoto per mantenere la password attuale.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Depot di Partenza</label>
+                            <input type="number" name="brt_departure_depot" class="form-control" min="0" value="<?= h($settings['brt_departure_depot'] ?? '0') ?>">
+                            <small class="text-muted">Codice filiale BRT (<code>departureDepot</code>), comunicato da BRT.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Codice Cliente Mittente</label>
+                            <input type="number" name="brt_sender_customer_code" class="form-control" min="0" value="<?= h($settings['brt_sender_customer_code'] ?? '0') ?>">
+                            <small class="text-muted">Codice cliente (<code>senderCustomerCode</code>), comunicato da BRT.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Tipo Porto</label>
+                            <select name="brt_freight_type" class="form-select">
+                                <option value="DAP" <?= ($settings['brt_freight_type']??'DAP')==='DAP'?'selected':'' ?>>DAP — Porto Franco</option>
+                                <option value="EXW" <?= ($settings['brt_freight_type']??'')==='EXW'?'selected':'' ?>>EXW — Porto Assegnato</option>
+                            </select>
+                            <small class="text-muted">Da concordare con BRT (<code>deliveryFreightTypeCode</code>).</small>
+                        </div>
+                    </div>
+                    <div class="mt-4 d-flex align-items-center gap-3">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salva Impostazioni BRT</button>
+                        <a href="<?= APP_URL ?>/install/migrate_brt.php" class="btn btn-outline-secondary btn-sm" target="_blank"><i class="bi bi-database-add me-1"></i>Esegui Migrazione DB</a>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
