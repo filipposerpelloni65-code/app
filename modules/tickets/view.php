@@ -218,7 +218,22 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
 <?php if (isset($_GET['created'])): ?>
 <div class="alert alert-success alert-dismissible fade show" role="alert">
     <i class="bi bi-check-circle me-2"></i>Ticket creato con successo!
+    <?php if (isset($_GET['spedizione_creata'])): ?>
+    <br><i class="bi bi-truck me-1"></i><strong>Spedizione automatica creata e in stato "Da Spedire"</strong> — aggiorna tracking e corriere dalla sezione Spedizioni.
+    <?php endif; ?>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php endif; ?>
+
+<?php if (($ticket['tipo_intervento'] ?? '') === 'solo_spedizione'): ?>
+<div class="alert alert-primary d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-truck-front-fill fs-5"></i>
+    <div><strong>Ticket Solo Spedizione</strong> — questo ticket genera solo una spedizione ricambi. Gestisci tracking e stato dalla sezione <strong>Spedizioni</strong> qui sotto.</div>
+</div>
+<?php elseif (($ticket['tipo_intervento'] ?? '') === 'onsite_sostituzione'): ?>
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-arrow-repeat fs-5"></i>
+    <div><strong>Onsite + Sostituzione</strong> — intervento con sostituzione componenti. Aggiungi spare parts, accessori e cavi nella sezione <strong>Componenti Inviati</strong>.</div>
 </div>
 <?php endif; ?>
 
@@ -391,9 +406,14 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
         <?php endif; ?>
 
         <!-- Componenti Inviati (Periferiche / Accessori / Cavi) -->
-        <div class="card border-0 shadow-sm mb-4" id="componenti">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="bi bi-cpu me-2 text-primary"></i>Componenti Inviati (<?= count($componenti) ?>)</h6>
+        <div class="card border-0 shadow-sm mb-4 <?= ($ticket['tipo_intervento'] ?? '') === 'onsite_sostituzione' ? 'border-warning border-2' : '' ?>" id="componenti">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center <?= ($ticket['tipo_intervento'] ?? '') === 'onsite_sostituzione' ? 'border-bottom border-warning' : '' ?>">
+                <h6 class="mb-0"><i class="bi bi-cpu me-2 text-primary"></i>Componenti Inviati
+                    <?php if (($ticket['tipo_intervento'] ?? '') === 'onsite_sostituzione'): ?>
+                    <span class="badge bg-warning text-dark ms-1"><i class="bi bi-arrow-repeat me-1"></i>Sostituzione</span>
+                    <?php endif; ?>
+                    (<?= count($componenti) ?>)
+                </h6>
             </div>
             <?php if ($componenti): ?>
             <div class="table-responsive">
@@ -543,6 +563,7 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
                 <dl class="row mb-0 small">
                     <dt class="col-sm-5">Stato</dt><dd class="col-sm-7"><?= getStatusBadge($ticket['status']) ?></dd>
                     <dt class="col-sm-5">Priorità</dt><dd class="col-sm-7"><?= getPriorityBadge($ticket['priority']) ?></dd>
+                    <dt class="col-sm-5">Tipo Intervento</dt><dd class="col-sm-7"><?= getTipoInterventoBadge($ticket['tipo_intervento'] ?? 'onsite') ?></dd>
                     <dt class="col-sm-5">Categoria</dt><dd class="col-sm-7"><?= $ticket['category_name'] ? h($ticket['category_name']) : '-' ?></dd>
                     <?php if (!empty($ticket['codice_concessionario'])): ?>
                     <dt class="col-sm-5">Rif. Concessionario</dt><dd class="col-sm-7 font-monospace"><?= h($ticket['codice_concessionario']) ?></dd>

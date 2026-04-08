@@ -244,6 +244,24 @@ function getComponenteTipoLabel(string $tipo): string {
     return $labels[$tipo] ?? $tipo;
 }
 
+function getTipoInterventoBadge(string $tipo): string {
+    $badges = [
+        'onsite'              => '<span class="badge bg-info text-dark"><i class="bi bi-house-door me-1"></i>Onsite</span>',
+        'onsite_sostituzione' => '<span class="badge bg-warning text-dark"><i class="bi bi-arrow-repeat me-1"></i>Onsite + Sostituzione</span>',
+        'solo_spedizione'     => '<span class="badge bg-primary"><i class="bi bi-truck me-1"></i>Solo Spedizione</span>',
+    ];
+    return $badges[$tipo] ?? '<span class="badge bg-secondary">' . htmlspecialchars($tipo) . '</span>';
+}
+
+function getTipoInterventoLabel(string $tipo): string {
+    $labels = [
+        'onsite'              => 'Onsite',
+        'onsite_sostituzione' => 'Onsite + Sostituzione',
+        'solo_spedizione'     => 'Solo Spedizione',
+    ];
+    return $labels[$tipo] ?? $tipo;
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 function createNotification(int $userId, string $type, string $title, string $message = '', string $entityType = '', int $entityId = 0, string $url = ''): void {
