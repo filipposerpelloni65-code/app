@@ -34,13 +34,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $contact_person = trim($_POST['contact_person'] ?? '');
     $active         = isset($_POST['active']) ? 1 : 0;
     $notes          = trim($_POST['notes'] ?? '');
+    $codice_aams      = trim($_POST['codice_aams'] ?? '');
+    $id_punto_vendita = trim($_POST['id_punto_vendita'] ?? '');
 
     if (!$name) $errors[] = 'Il nome è obbligatorio.';
     if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Email non valida.';
 
     if (!$errors) {
-        $stmt = $db->prepare("INSERT INTO dealer_locations (dealer_id, name, code, address, city, phone, email, contact_person, active, notes) VALUES (?,?,?,?,?,?,?,?,?,?)");
-        $stmt->execute([$dealerId, $name, $code, $address, $city, $phone, $email, $contact_person, $active, $notes]);
+        $stmt = $db->prepare("INSERT INTO dealer_locations (dealer_id, name, code, address, city, phone, email, contact_person, active, notes, codice_aams, id_punto_vendita) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([$dealerId, $name, $code, $address, $city, $phone, $email, $contact_person, $active, $notes, $codice_aams ?: null, $id_punto_vendita ?: null]);
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'create', 'dealer_location', $newId, "Creato punto vendita: $name");
         header('Location: ' . APP_URL . '/modules/dealers/view.php?id=' . $dealerId . '&updated=1');
@@ -107,6 +109,22 @@ include APP_ROOT . '/includes/header.php';
     <div class="mb-3">
         <label class="form-label fw-semibold">Note</label>
         <textarea name="notes" class="form-control" rows="2"><?= h($_POST['notes'] ?? '') ?></textarea>
+    </div>
+    <hr class="my-3">
+    <div class="mb-2">
+        <span class="form-section-title"><i class="bi bi-shield-check me-1"></i>Dati Regolatori (AAMS/ADM)</span>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Codice AAMS <span class="text-muted fw-normal">(opzionale)</span></label>
+            <input type="text" name="codice_aams" class="form-control font-monospace" value="<?= h($_POST['codice_aams'] ?? '') ?>" placeholder="Es. 12345/ADM">
+            <div class="form-text">Codice concessione ADM (ex AAMS)</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">ID Punto Vendita <span class="text-muted fw-normal">(opzionale)</span></label>
+            <input type="text" name="id_punto_vendita" class="form-control font-monospace" value="<?= h($_POST['id_punto_vendita'] ?? '') ?>" placeholder="Es. PV-00001">
+            <div class="form-text">Identificativo univoco punto vendita</div>
+        </div>
     </div>
     <div class="mb-4">
         <div class="form-check">

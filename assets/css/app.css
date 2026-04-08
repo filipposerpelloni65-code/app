@@ -231,7 +231,7 @@ body.sidebar-collapsed .sidebar .user-avatar {
 #page-content-wrapper {
     min-width: 0;
     overflow-x: auto;
-    animation: fadeIn 0.35s ease both;
+    animation: fadeIn 0.35s ease backwards;
 }
 
 /* ── Top Navbar ─────────────────────────────────────────────────────────────── */
@@ -1063,9 +1063,14 @@ body.sidebar-collapsed .sidebar .user-avatar {
 .gap-1   { gap: 0.25rem !important; }
 .gap-2   { gap: 0.5rem !important; }
 
-/* Smooth page transitions */
+/* Smooth page transitions
+   Use 'backwards' fill-mode so that after the animation completes the
+   element reverts to its natural styles (no leftover transform).
+   A persistent transform would create a new stacking context and push
+   Bootstrap modals/backdrops out of order, making modals appear
+   transparent and the page unresponsive. */
 .container-fluid {
-    animation: fadeIn 0.3s ease both;
+    animation: fadeIn 0.3s ease backwards;
 }
 
 /* Input group improvements */

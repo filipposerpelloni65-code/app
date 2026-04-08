@@ -104,9 +104,15 @@ include APP_ROOT . '/includes/header.php';
                 <div class="list-group-item py-2">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="fw-semibold small"><?= h($loc['name']) ?></div>
+                            <div class="fw-semibold small"><?= h($loc['name']) ?>
+                                <?php if (!empty($loc['code'])): ?>
+                                <span class="badge bg-secondary fw-normal font-monospace ms-1"><?= h($loc['code']) ?></span>
+                                <?php endif; ?>
+                            </div>
                             <?php if ($loc['city']): ?><div class="text-muted small"><i class="bi bi-geo-alt me-1"></i><?= h($loc['city']) ?></div><?php endif; ?>
                             <?php if ($loc['contact_person']): ?><div class="text-muted small"><i class="bi bi-person me-1"></i><?= h($loc['contact_person']) ?></div><?php endif; ?>
+                            <?php if (!empty($loc['id_punto_vendita'])): ?><div class="text-muted small"><i class="bi bi-upc-scan me-1"></i>ID PV: <span class="font-monospace"><?= h($loc['id_punto_vendita']) ?></span></div><?php endif; ?>
+                            <?php if (!empty($loc['codice_aams'])): ?><div class="text-muted small"><i class="bi bi-shield-check me-1 text-info"></i>AAMS: <span class="font-monospace text-info"><?= h($loc['codice_aams']) ?></span></div><?php endif; ?>
                         </div>
                         <div class="d-flex flex-column align-items-end gap-1">
                             <?= $loc['active'] ? '<span class="badge bg-success">Attivo</span>' : '<span class="badge bg-secondary">Inattivo</span>' ?>

@@ -536,30 +536,56 @@ window.appUrl = window.appUrl || '';
     'use strict';
 
     // Animate table rows on page load with stagger
+    // NOTE: After animation we clear the inline style completely so no
+    // persistent transform (which would create a new stacking context) remains.
     function animateTableRows() {
         var rows = document.querySelectorAll('tbody tr');
         rows.forEach(function (row, i) {
+            var delay      = 40 + i * 30;
+            var transTime  = 300;
             row.style.opacity = '0';
             row.style.transform = 'translateY(10px)';
-            row.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            row.style.transition = 'opacity ' + transTime + 'ms ease, transform ' + transTime + 'ms ease';
+            // Start transition to final visible state
             setTimeout(function () {
                 row.style.opacity = '1';
                 row.style.transform = 'translateY(0)';
-            }, 40 + i * 30);
+            }, delay);
+            // After transition completes, remove all inline styles so no
+            // stacking context lingers on the row element.
+            setTimeout(function () {
+                row.style.opacity = '';
+                row.style.transform = '';
+                row.style.transition = '';
+            }, delay + transTime + 50);
         });
     }
 
     // Animate cards on page load with stagger
+    // NOTE: Skip cards inside modals to avoid stacking-context issues, and
+    // clear inline styles after completion so no transform lingers.
     function animateCards() {
-        var cards = document.querySelectorAll('.card:not(.no-anim)');
+        var cards = document.querySelectorAll('.card:not(.no-anim):not(.modal-content)');
         cards.forEach(function (card, i) {
+            // Skip cards that are inside a modal element
+            if (card.closest('.modal')) return;
+            var delay     = 60 + i * 50;
+            var transTime = 350;
             card.style.opacity = '0';
             card.style.transform = 'translateY(14px)';
-            card.style.transition = 'opacity 0.35s ease, transform 0.35s ease, box-shadow 0.25s ease';
+            card.style.transition = 'opacity ' + transTime + 'ms ease, transform ' + transTime + 'ms ease, box-shadow 250ms ease';
+            // Start transition to final visible state
             setTimeout(function () {
                 card.style.opacity = '1';
                 card.style.transform = 'translateY(0)';
-            }, 60 + i * 50);
+            }, delay);
+            // After transition completes, remove all inline styles so no
+            // stacking context lingers on the card element.
+            setTimeout(function () {
+                card.style.opacity = '';
+                card.style.transform = '';
+                card.style.transition = '';
+            }, delay + transTime + 50);
         });
     }
 
