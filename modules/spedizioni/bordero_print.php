@@ -56,7 +56,7 @@ if ($ids) {
             d.name  AS dealer_name,
             d.address AS dealer_address,
             d.city  AS dealer_city,
-            d.province AS dealer_province,
+            d.region AS dealer_region,
             dl.name AS location_name,
             sp.name AS part_name,
             t.title AS ticket_title
