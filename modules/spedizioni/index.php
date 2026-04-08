@@ -58,6 +58,9 @@ include APP_ROOT . '/includes/header.php';
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>Gestione Spedizioni</h4>
     <div class="d-flex gap-2">
+        <a href="<?= APP_URL ?>/modules/spedizioni/bordero.php" class="btn btn-warning btn-sm">
+            <i class="bi bi-file-earmark-text me-1"></i>Gestione Bordero
+        </a>
         <a href="<?= APP_URL ?>/modules/spedizioni/report.php" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-file-earmark-bar-graph me-1"></i>Report Tecnici
         </a>
@@ -77,6 +80,7 @@ include APP_ROOT . '/includes/header.php';
             <div class="col-md-3">
                 <select name="status" class="form-select form-select-sm">
                     <option value="">Tutti gli stati</option>
+                    <option value="bozza" <?= ($_GET['status'] ?? '') === 'bozza' ? 'selected' : '' ?>>Bozza</option>
                     <option value="da_spedire" <?= ($_GET['status'] ?? '') === 'da_spedire' ? 'selected' : '' ?>>Da Spedire</option>
                     <option value="spedita" <?= ($_GET['status'] ?? '') === 'spedita' ? 'selected' : '' ?>>Spedita</option>
                     <option value="consegnata" <?= ($_GET['status'] ?? '') === 'consegnata' ? 'selected' : '' ?>>Consegnata</option>
@@ -98,7 +102,7 @@ include APP_ROOT . '/includes/header.php';
 <div class="d-flex gap-2 mb-3 flex-wrap">
     <?php
     $statusCounts = $db->query("SELECT status, COUNT(*) AS cnt FROM spedizioni GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
-    $statusList = ['da_spedire' => 'Da Spedire', 'spedita' => 'Spedita', 'consegnata' => 'Consegnata', 'annullata' => 'Annullata'];
+    $statusList = ['bozza' => 'Bozza', 'da_spedire' => 'Da Spedire', 'spedita' => 'Spedita', 'consegnata' => 'Consegnata', 'annullata' => 'Annullata'];
     foreach ($statusList as $sk => $sl):
         $cnt = $statusCounts[$sk] ?? 0;
     ?>

@@ -35,7 +35,7 @@ $s = $stmt->fetch();
 if (!$s) { header('Location: ' . APP_URL . '/modules/spedizioni/index.php'); exit; }
 
 $hasBrt      = !empty($s['brt_parcel_id']);
-$hasLabel    = !empty($s['brt_label_stream']);
+$hasLabel    = !empty($s['brt_label_stream']) || !empty($s['brt_labels_json']);
 $brtApiReady = (getBrtApi() !== null);
 
 define('PAGE_TITLE', 'Spedizione #' . $id);
@@ -63,7 +63,26 @@ include APP_ROOT . '/includes/header.php';
     </div>
     <div class="d-flex gap-2 flex-wrap">
         <?php if ($hasLabel): ?>
-        <a href="<?= APP_URL ?>/api/brt_label.php?id=<?= $id ?>" class="btn btn-outline-primary btn-sm" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>Etichetta BRT</a>
+        <?php
+        $labelCount = 1;
+        if (!empty($s['brt_labels_json'])) {
+            $lblArr = json_decode($s['brt_labels_json'], true) ?? [];
+            $labelCount = count($lblArr);
+        }
+        ?>
+        <a href="<?= APP_URL ?>/api/brt_labels_a4.php?id=<?= $id ?>" class="btn btn-outline-primary btn-sm" target="_blank">
+            <i class="bi bi-file-earmark-pdf me-1"></i>Etichette A4 (<?= $labelCount ?>)
+        </a>
+        <?php if ($labelCount > 1): ?>
+        <a href="<?= APP_URL ?>/api/brt_label.php?id=<?= $id ?>" class="btn btn-outline-secondary btn-sm" target="_blank" title="Prima etichetta singola">
+            <i class="bi bi-tag me-1"></i>Etichetta #1
+        </a>
+        <?php endif; ?>
+        <?php endif; ?>
+        <?php if (in_array($s['status'], ['bozza']) && isTechnician()): ?>
+        <a href="<?= APP_URL ?>/modules/spedizioni/bordero.php" class="btn btn-warning btn-sm">
+            <i class="bi bi-send me-1"></i>Vai a Gestione Bordero
+        </a>
         <?php endif; ?>
         <?php if (isTechnician()): ?>
         <a href="<?= APP_URL ?>/modules/spedizioni/edit.php?id=<?= $id ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Modifica</a>
@@ -91,6 +110,15 @@ include APP_ROOT . '/includes/header.php';
                         <?php endif; ?>
                         <?php if ($s['data_consegna_prevista']): ?>
                         <tr><td class="fw-semibold bg-light">Consegna Prevista</td><td><?= formatDate($s['data_consegna_prevista'], 'd/m/Y') ?></td></tr>
+                        <?php endif; ?>
+                        <?php if (!empty($s['num_colli'])): ?>
+                        <tr><td class="fw-semibold bg-light">N° Colli</td><td><?= (int)$s['num_colli'] ?></td></tr>
+                        <?php endif; ?>
+                        <?php if (!empty($s['peso_kg'])): ?>
+                        <tr><td class="fw-semibold bg-light">Peso</td><td><?= number_format((float)$s['peso_kg'], 2) ?> kg</td></tr>
+                        <?php endif; ?>
+                        <?php if (!empty($s['transmitted_at'])): ?>
+                        <tr><td class="fw-semibold bg-light">Trasmessa a BRT il</td><td><?= formatDate($s['transmitted_at']) ?></td></tr>
                         <?php endif; ?>
                         <tr><td class="fw-semibold bg-light">Creata il</td><td><?= formatDate($s['created_at']) ?></td></tr>
                         <tr><td class="fw-semibold bg-light">Creata da</td><td><?= h($s['creator_name'] ?? '') ?></td></tr>

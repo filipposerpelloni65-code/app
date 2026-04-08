@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $tracking        = trim($_POST['tracking_number'] ?? '');
     $corriere        = trim($_POST['corriere'] ?? '');
-    $status          = $_POST['status'] ?? 'da_spedire';
+    $status          = $_POST['status'] ?? 'bozza';
     $ticketId        = (int)($_POST['ticket_id'] ?? 0) ?: null;
     $sprId           = (int)($_POST['spare_parts_request_id'] ?? 0) ?: null;
     $dealerId        = (int)($_POST['dealer_id'] ?? 0) ?: null;
@@ -40,84 +40,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dataSped        = trim($_POST['data_spedizione'] ?? '') ?: null;
     $dataConsegna    = trim($_POST['data_consegna_prevista'] ?? '') ?: null;
     $useBrt          = isset($_POST['use_brt']) && $brtAvailable;
+    $numColli        = max(1, (int)($_POST['brt_num_parcels'] ?? 1));
+    $pesoKg          = max(0.1, (float)($_POST['brt_weight_kg'] ?? 1.0));
 
-    if (!in_array($status, ['da_spedire','spedita','consegnata','annullata'])) { $errors[] = 'Stato non valido.'; }
+    if (!in_array($status, ['bozza','da_spedire','spedita','consegnata','annullata'])) { $errors[] = 'Stato non valido.'; }
 
-    // BRT API call
-    $brtParcelId    = null;
-    $brtLabelStream = null;
-    $brtNumericRef  = null;
-
-    if (!$errors && $useBrt) {
-        $brt = getBrtApi();
-
-        // Resolve consignee data from dealer/location
+    // Collect BRT consignee data for deferred transmission (no API call here)
+    $brtConsigneeJson = null;
+    if ($useBrt) {
         $consigneeName    = trim($_POST['brt_consignee_name'] ?? '');
         $consigneeAddress = trim($_POST['brt_consignee_address'] ?? '');
         $consigneeZip     = trim($_POST['brt_consignee_zip'] ?? '');
         $consigneeCity    = trim($_POST['brt_consignee_city'] ?? '');
         $consigneeProv    = trim($_POST['brt_consignee_province'] ?? '');
-        $numParcels       = max(1, (int)($_POST['brt_num_parcels'] ?? 1));
-        $weightKg         = max(0.1, (float)($_POST['brt_weight_kg'] ?? 1.0));
-        $brtNumericRef    = (int)($_POST['brt_numeric_ref'] ?? 0) ?: (int)(microtime(true) * 1000) % 9999999;
 
         if (!$consigneeName || !$consigneeAddress || !$consigneeZip || !$consigneeCity) {
             $errors[] = 'Compila i campi BRT: Ragione Sociale, Indirizzo, CAP e Città del destinatario.';
-        }
-
-        if (!$errors) {
-            $createData = [
+        } else {
+            $brtData = [
                 'consigneeCompanyName'                  => mb_substr($consigneeName, 0, 70),
                 'consigneeAddress'                      => mb_substr($consigneeAddress, 0, 35),
                 'consigneeZIPCode'                      => mb_substr($consigneeZip, 0, 9),
                 'consigneeCity'                         => mb_substr($consigneeCity, 0, 35),
                 'consigneeCountryAbbreviationISOAlpha2' => 'IT',
-                'numberOfParcels'                       => $numParcels,
-                'weightKG'                              => $weightKg,
-                'numericSenderReference'                => $brtNumericRef,
-                'notes'                                 => mb_substr($note, 0, 70),
             ];
             if ($consigneeProv) {
-                $createData['consigneeProvinceAbbreviation'] = strtoupper(mb_substr($consigneeProv, 0, 2));
+                $brtData['consigneeProvinceAbbreviation'] = strtoupper(mb_substr($consigneeProv, 0, 2));
             }
-
-            $result = $brt->createShipment($createData, true);
-
-            if (!$result['success']) {
-                $errMsg = 'BRT: ' . ($result['error'] ?? 'Errore sconosciuto');
-                // Append raw BRT response for admin debugging
-                if (!empty($result['data'])) {
-                    $errMsg .= ' [Risposta: ' . json_encode($result['data'], JSON_UNESCAPED_UNICODE) . ']';
-                }
-                $errors[] = $errMsg;
-            } else {
-                $cr = $result['data']['createResponse'] ?? [];
-                $brtParcelId = $cr['labels']['label'][0]['parcelID'] ?? null;
-                if (!$brtParcelId && isset($cr['labels']['label']['parcelID'])) {
-                    $brtParcelId = $cr['labels']['label']['parcelID'];
-                }
-                // tracking number = parcelNumberFrom
-                if (empty($tracking) && !empty($cr['parcelNumberFrom'])) {
-                    $tracking = $cr['parcelNumberFrom'];
-                }
-                if (empty($corriere)) { $corriere = 'BRT'; }
-                if ($status === 'da_spedire') { $status = 'spedita'; }
-                if (empty($dataSped)) { $dataSped = date('Y-m-d'); }
-
-                // Store label PDF stream (first label)
-                $labelEntry = $cr['labels']['label'][0] ?? $cr['labels']['label'] ?? null;
-                if ($labelEntry && !empty($labelEntry['stream'])) {
-                    $brtLabelStream = $labelEntry['stream'];
-                }
-            }
+            $brtConsigneeJson = json_encode($brtData, JSON_UNESCAPED_UNICODE);
+            if (empty($corriere)) { $corriere = 'BRT'; }
         }
     }
 
     if (!$errors) {
-        $stmt = $db->prepare("INSERT INTO spedizioni (tracking_number, corriere, status, ticket_id, spare_parts_request_id, dealer_id, location_id, note, data_spedizione, data_consegna_prevista, brt_parcel_id, brt_numeric_ref, brt_label_stream, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $stmt->execute([$tracking ?: null, $corriere ?: null, $status, $ticketId, $sprId, $dealerId, $locationId, $note ?: null, $dataSped, $dataConsegna, $brtParcelId, $brtNumericRef, $brtLabelStream, $user['id']]);
+        $stmt = $db->prepare("INSERT INTO spedizioni (tracking_number, corriere, status, ticket_id, spare_parts_request_id, dealer_id, location_id, note, data_spedizione, data_consegna_prevista, brt_consignee_json, num_colli, peso_kg, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([$tracking ?: null, $corriere ?: null, $status, $ticketId, $sprId, $dealerId, $locationId, $note ?: null, $dataSped, $dataConsegna, $brtConsigneeJson, $numColli, $pesoKg, $user['id']]);
         $newId = $db->lastInsertId();
-        logActivity($user['id'], 'create', 'spedizione', (int)$newId, "Creata spedizione tracking: $tracking" . ($brtParcelId ? " (BRT parcel: $brtParcelId)" : ''));
+        logActivity($user['id'], 'create', 'spedizione', (int)$newId, "Creata spedizione in $status" . ($brtConsigneeJson ? ' (BRT dati destinatario salvati)' : ''));
         header('Location: ' . APP_URL . '/modules/spedizioni/view.php?id=' . $newId . '&created=1');
         exit;
     }
@@ -151,7 +110,8 @@ include APP_ROOT . '/includes/header.php';
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Stato <span class="text-danger">*</span></label>
                     <select name="status" class="form-select" required>
-                        <option value="da_spedire" <?= ($_POST['status'] ?? 'da_spedire') === 'da_spedire' ? 'selected' : '' ?>>Da Spedire</option>
+                        <option value="bozza" <?= ($_POST['status'] ?? 'bozza') === 'bozza' ? 'selected' : '' ?>>Bozza</option>
+                        <option value="da_spedire" <?= ($_POST['status'] ?? '') === 'da_spedire' ? 'selected' : '' ?>>Da Spedire</option>
                         <option value="spedita" <?= ($_POST['status'] ?? '') === 'spedita' ? 'selected' : '' ?>>Spedita</option>
                         <option value="consegnata" <?= ($_POST['status'] ?? '') === 'consegnata' ? 'selected' : '' ?>>Consegnata</option>
                         <option value="annullata" <?= ($_POST['status'] ?? '') === 'annullata' ? 'selected' : '' ?>>Annullata</option>
@@ -219,9 +179,9 @@ include APP_ROOT . '/includes/header.php';
             <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" name="use_brt" id="useBrt" <?= isset($_POST['use_brt']) ? 'checked' : '' ?>>
                 <label class="form-check-label fw-semibold" for="useBrt">
-                    <i class="bi bi-truck text-primary me-1"></i>Crea spedizione tramite BRT API
+                    <i class="bi bi-truck text-primary me-1"></i>Spedizione via BRT
                 </label>
-                <small class="d-block text-muted">Registra la spedizione in BRT, genera etichetta PDF e compila il tracking automaticamente.</small>
+                <small class="d-block text-muted">Salva i dati del destinatario BRT. La trasmissione avviene dalla pagina <strong>Gestione Bordero</strong>.</small>
             </div>
             <div id="brtFields" class="<?= isset($_POST['use_brt']) ? '' : 'd-none' ?>">
                 <div class="card border-primary border-opacity-25 mb-3">
@@ -257,11 +217,6 @@ include APP_ROOT . '/includes/header.php';
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">Peso (kg)</label>
                                 <input type="number" name="brt_weight_kg" class="form-control" min="0.1" step="0.1" value="<?= h($_POST['brt_weight_kg'] ?? '1.0') ?>">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-semibold">Rif. Numerico Mittente</label>
-                                <input type="number" name="brt_numeric_ref" class="form-control" min="1" max="9999999" value="<?= h($_POST['brt_numeric_ref'] ?? '') ?>" placeholder="Autogenerato">
-                                <small class="text-muted">Lascia vuoto per generare automaticamente.</small>
                             </div>
                         </div>
                     </div>

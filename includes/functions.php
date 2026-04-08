@@ -173,6 +173,7 @@ function getModalOpenTickets(int $limit = 100): array {
 
 function getSpedizioneStatusBadge(string $status): string {
     $badges = [
+        'bozza'       => '<span class="badge bg-warning text-dark">Bozza</span>',
         'da_spedire'  => '<span class="badge bg-secondary">Da Spedire</span>',
         'spedita'     => '<span class="badge bg-primary">Spedita</span>',
         'consegnata'  => '<span class="badge bg-success">Consegnata</span>',
@@ -183,6 +184,7 @@ function getSpedizioneStatusBadge(string $status): string {
 
 function getSpedizioneStatusLabel(string $status): string {
     $labels = [
+        'bozza'      => 'Bozza',
         'da_spedire' => 'Da Spedire',
         'spedita'    => 'Spedita',
         'consegnata' => 'Consegnata',
