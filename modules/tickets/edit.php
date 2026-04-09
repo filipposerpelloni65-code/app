@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/modules.php';
+require_once __DIR__ . '/../../includes/mailer.php';
 
 requireRole('admin', 'technician');
 if (!isModuleEnabled('tickets')) { header('Location: ' . APP_URL . '/dashboard.php'); exit; }
@@ -31,14 +32,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $codice_concessionario = trim($_POST['codice_concessionario'] ?? '') ?: null;
     $tipo_intervento = $_POST['tipo_intervento'] ?? $ticket['tipo_intervento'] ?? 'onsite';
     if (!in_array($tipo_intervento, ['onsite','onsite_sostituzione','solo_spedizione'])) $tipo_intervento = 'onsite';
+    $due_date_raw = trim($_POST['due_date'] ?? '');
+    $due_date = $due_date_raw ? date('Y-m-d H:i:s', strtotime($due_date_raw)) : null;
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!in_array($status, ['open','in_progress','waiting','resolved','closed'])) $errors[] = 'Stato non valido.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
     if (!$errors) {
         $closedAt = in_array($status, ['resolved','closed']) && !$ticket['closed_at'] ? ', closed_at=NOW()' : '';
-        $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, category_id=?, assigned_to=?, codice_concessionario=?, tipo_intervento=?, updated_at=NOW()$closedAt WHERE id=?");
-        $stmt->execute([$title, $description, $status, $priority, $category_id, $assigned_to, $codice_concessionario, $tipo_intervento, $id]);
+        $stmt = $db->prepare("UPDATE tickets SET title=?, description=?, status=?, priority=?, category_id=?, assigned_to=?, codice_concessionario=?, tipo_intervento=?, due_date=?, updated_at=NOW()$closedAt WHERE id=?");
+        $stmt->execute([$title, $description, $status, $priority, $category_id, $assigned_to, $codice_concessionario, $tipo_intervento, $due_date, $id]);
         logActivity($user['id'], 'edit', 'ticket', $id, "Modificato ticket: $title");
+        // Changelog: record changed fields
+        foreach (['status' => [$ticket['status'], $status], 'priority' => [$ticket['priority'], $priority], 'assigned_to' => [(string)($ticket['assigned_to'] ?? ''), (string)($assigned_to ?? '')]] as $chField => [$oldVal, $newVal]) {
+            if ($oldVal !== $newVal) {
+                logTicketChange($id, $user['id'], 'edited', $chField, $oldVal, $newVal);
+            }
+        }
+        if ($ticket['title'] !== $title) logTicketChange($id, $user['id'], 'edited', 'title', $ticket['title'], $title);
         $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $id;
         $prefix = getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
         // Notify on assignment change

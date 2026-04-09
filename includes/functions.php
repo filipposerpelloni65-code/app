@@ -307,3 +307,27 @@ function notifyAdmins(string $type, string $title, string $message = '', string 
         // Fail silently
     }
 }
+
+// ─── Ticket Changelog ─────────────────────────────────────────────────────────
+
+/**
+ * Record a changelog entry for a ticket.
+ * Table ticket_changelog must exist (see install/migrate_changelog.php).
+ *
+ * @param int    $ticketId
+ * @param int    $userId    0 for system/cron
+ * @param string $action    e.g. 'created', 'edited', 'status_change', 'comment', 'assigned'
+ * @param string $field     Field that changed (optional)
+ * @param string $oldValue  Previous value (optional)
+ * @param string $newValue  New value (optional)
+ * @param string $note      Free-form note (optional)
+ */
+function logTicketChange(int $ticketId, int $userId, string $action, string $field = '', string $oldValue = '', string $newValue = '', string $note = ''): void {
+    try {
+        $db = getDB();
+        $db->prepare("INSERT INTO ticket_changelog (ticket_id, user_id, action, field, old_value, new_value, note) VALUES (?,?,?,?,?,?,?)")
+           ->execute([$ticketId, $userId ?: null, $action, $field ?: null, $oldValue !== '' ? $oldValue : null, $newValue !== '' ? $newValue : null, $note ?: null]);
+    } catch (Exception $e) {
+        // Fail silently — changelog must not break main flow
+    }
+}

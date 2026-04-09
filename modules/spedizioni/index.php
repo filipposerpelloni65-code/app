@@ -65,6 +65,9 @@ include APP_ROOT . '/includes/header.php';
             <i class="bi bi-file-earmark-bar-graph me-1"></i>Report Tecnici
         </a>
         <?php if (isTechnician()): ?>
+        <button type="button" class="btn btn-outline-info btn-sm" id="btnTrackAll" title="Aggiorna tracking BRT per tutte le spedizioni in stato Spedita">
+            <i class="bi bi-arrow-repeat me-1"></i>Traccia tutte
+        </button>
         <a href="<?= APP_URL ?>/modules/spedizioni/create.php" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuova Spedizione</a>
         <?php endif; ?>
     </div>
@@ -187,3 +190,29 @@ include APP_ROOT . '/includes/header.php';
 </div>
 
 <?php include APP_ROOT . '/includes/footer.php'; ?>
+
+<?php if (isTechnician()): ?>
+<script>
+document.getElementById('btnTrackAll')?.addEventListener('click', function () {
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Tracking…';
+    fetch('<?= APP_URL ?>/api/brt_track_all.php', { method: 'GET', credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const s = data.stats;
+                alert('Tracking completato:\n• Consegnate: ' + s.updated + '\n• Invariate: ' + s.unchanged + '\n• Errori: ' + s.errors + '\n• Totale: ' + s.total);
+                if (s.updated > 0) location.reload();
+            } else {
+                alert('Errore: ' + (data.error || 'sconosciuto'));
+            }
+        })
+        .catch(() => alert('Errore di connessione.'))
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Traccia tutte';
+        });
+});
+</script>
+<?php endif; ?>
