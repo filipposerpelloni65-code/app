@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/modules.php';
+require_once __DIR__ . '/../../includes/mailer.php';
 
 requireLogin();
 if (!isModuleEnabled('tickets')) { header('Location: ' . APP_URL . '/dashboard.php'); exit; }
@@ -37,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Update ticket updated_at
         $db->prepare("UPDATE tickets SET updated_at=NOW() WHERE id=?")->execute([$id]);
         logActivity($user['id'], 'comment', 'ticket', $id, 'Aggiunto commento');
+        logTicketChange($id, $user['id'], 'comment', '', '', '', $is_internal ? '[interno] ' . substr($message, 0, 200) : substr($message, 0, 200));
         // Notifications: notify ticket creator and assigned technician
         if (getSetting('notif_ticket_comment', '1') === '1') {
             $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $id . '#comments';
@@ -52,6 +54,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 createNotification((int)$ticket['assigned_to'], 'comment', $notifTitle, $notifMsg, 'ticket', $id, $ticketUrl);
             }
         }
+        // Email: notify ticket creator and assignee (if not the commenter)
+        if (!$is_internal && getSetting('email_notifications', '0') === '1') {
+            $prefix = getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
+            $ticketUrlMail = APP_URL . '/modules/tickets/view.php?id=' . $id . '#comments';
+            $emailRecipients = [];
+            foreach (['created_by','assigned_to'] as $field) {
+                $uid = (int)($ticket[$field] ?? 0);
+                if ($uid && $uid !== $user['id'] && !in_array($uid, $emailRecipients)) {
+                    $emailRecipients[] = $uid;
+                }
+            }
+            if ($emailRecipients) {
+                $snippet = htmlspecialchars(strlen($message) > 200 ? substr($message, 0, 200) . '…' : $message);
+                $content = '<p>È stato aggiunto un nuovo commento sul ticket <strong>' . htmlspecialchars($prefix) . '</strong>:</p>'
+                    . '<blockquote style="border-left:4px solid #e2e8f0;margin:12px 0;padding:8px 16px;color:#475569;">' . $snippet . '</blockquote>'
+                    . '<p><a href="' . htmlspecialchars($ticketUrlMail) . '" style="background:' . htmlspecialchars(getSetting('theme_primary_color','#3b82f6')) . ';color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">Visualizza Ticket</a></p>';
+                $stmtU = $db->prepare("SELECT email, full_name FROM users WHERE id=?");
+                foreach ($emailRecipients as $uid) {
+                    $stmtU->execute([$uid]);
+                    $rec = $stmtU->fetch();
+                    if ($rec) {
+                        sendAppEmail($rec['email'], $rec['full_name'], 'Nuovo commento: ' . $prefix, buildEmailHtml('Nuovo commento', $content));
+                    }
+                }
+            }
+        }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id . '#comments');
         exit;
     }
@@ -65,6 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $closedAt = in_array($newStatus, ['resolved','closed']) ? ', closed_at=NOW()' : '';
         $db->prepare("UPDATE tickets SET status=?, updated_at=NOW()$closedAt WHERE id=?")->execute([$newStatus, $id]);
         logActivity($user['id'], 'status_change', 'ticket', $id, "Stato cambiato in: $newStatus");
+        logTicketChange($id, $user['id'], 'status_change', 'status', $ticket['status'], $newStatus);
         // Notifications for status change
         if (getSetting('notif_ticket_resolved', '1') === '1' && in_array($newStatus, ['resolved','closed'])) {
             $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $id;
@@ -79,6 +108,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if ($ticket['assigned_to'] && !in_array((int)$ticket['assigned_to'], $notified)) {
                 createNotification((int)$ticket['assigned_to'], 'status', $notifTitle, '', 'ticket', $id, $ticketUrl);
                 $notified[] = (int)$ticket['assigned_to'];
+            }
+        }
+        // Email notification for status change
+        if (getSetting('email_notifications', '0') === '1') {
+            $prefix2 = getTicketPrefix() . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
+            $ticketUrlMail2 = APP_URL . '/modules/tickets/view.php?id=' . $id;
+            $statusLabel2 = getStatusLabel($newStatus);
+            $emailRecipients2 = [];
+            foreach (['created_by','assigned_to'] as $field) {
+                $uid = (int)($ticket[$field] ?? 0);
+                if ($uid && $uid !== $user['id'] && !in_array($uid, $emailRecipients2)) {
+                    $emailRecipients2[] = $uid;
+                }
+            }
+            if ($emailRecipients2) {
+                $content2 = '<p>Lo stato del ticket <strong>' . htmlspecialchars($prefix2) . '</strong> è stato aggiornato:</p>'
+                    . '<table style="border-collapse:collapse"><tr>'
+                    . '<td style="padding:6px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-weight:600">Nuovo stato</td>'
+                    . '<td style="padding:6px 12px;border:1px solid #e2e8f0">' . htmlspecialchars($statusLabel2) . '</td>'
+                    . '</tr></table>'
+                    . '<p style="margin-top:20px"><a href="' . htmlspecialchars($ticketUrlMail2) . '" style="background:' . htmlspecialchars(getSetting('theme_primary_color','#3b82f6')) . ';color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">Visualizza Ticket</a></p>';
+                $stmtU2 = $db->prepare("SELECT email, full_name FROM users WHERE id=?");
+                foreach ($emailRecipients2 as $uid) {
+                    $stmtU2->execute([$uid]);
+                    $rec2 = $stmtU2->fetch();
+                    if ($rec2) {
+                        sendAppEmail($rec2['email'], $rec2['full_name'], 'Stato ticket: ' . $prefix2 . ' → ' . $statusLabel2, buildEmailHtml('Aggiornamento stato ticket', $content2));
+                    }
+                }
             }
         }
         header('Location: ' . APP_URL . '/modules/tickets/view.php?id=' . $id);
@@ -383,6 +441,48 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
         </div>
         <?php endif; ?>
 
+        <!-- Storico Modifiche (Changelog) -->
+        <?php if (isTechnician()): ?>
+        <?php
+        $changelog = [];
+        try {
+            $clStmt = $db->prepare("SELECT cl.*, u.full_name AS user_name FROM ticket_changelog cl LEFT JOIN users u ON cl.user_id=u.id WHERE cl.ticket_id=? ORDER BY cl.created_at DESC LIMIT 100");
+            $clStmt->execute([$id]);
+            $changelog = $clStmt->fetchAll();
+        } catch (Exception $e) { /* table may not exist yet */ }
+        ?>
+        <div class="card border-0 shadow-sm mb-4" id="changelog">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-clock-history me-2 text-secondary"></i>Storico Modifiche (<?= count($changelog) ?>)</h6>
+            </div>
+            <?php if ($changelog): ?>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>Data</th><th>Utente</th><th>Azione</th><th>Campo</th><th>Da</th><th>A / Note</th></tr></thead>
+                    <tbody>
+                    <?php
+                    $actionLabels = ['created'=>'Creato','edited'=>'Modificato','status_change'=>'Stato','comment'=>'Commento','assigned'=>'Assegnato'];
+                    foreach ($changelog as $cl):
+                    $actionLabel = $actionLabels[$cl['action']] ?? h($cl['action']);
+                    ?>
+                    <tr>
+                        <td class="small text-nowrap text-muted"><?= formatDate($cl['created_at']) ?></td>
+                        <td class="small"><?= $cl['user_name'] ? h($cl['user_name']) : '<span class="text-muted">Sistema</span>' ?></td>
+                        <td class="small"><span class="badge bg-secondary"><?= $actionLabel ?></span></td>
+                        <td class="small text-muted"><?= $cl['field'] ? h($cl['field']) : '-' ?></td>
+                        <td class="small text-muted"><?= $cl['old_value'] !== null ? h($cl['old_value']) : '-' ?></td>
+                        <td class="small"><?= $cl['new_value'] !== null ? h($cl['new_value']) : ($cl['note'] ? h(substr($cl['note'],0,100)) : '-') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="card-body text-muted small">Nessuna modifica registrata.</div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <!-- Spare Parts Requests -->
         <?php if ($partsRequests): ?>
         <div class="card border-0 shadow-sm mb-4">
@@ -575,6 +675,14 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
                     <?php endif; ?>
                     <?php if ($ticket['location_name']): ?>
                     <dt class="col-sm-5">Punto Vendita</dt><dd class="col-sm-7"><?= h($ticket['location_name']) ?></dd>
+                    <?php endif; ?>
+                    <?php if (!empty($ticket['due_date'])): ?>
+                    <?php $overdue = strtotime($ticket['due_date']) < time() && !in_array($ticket['status'], ['resolved','closed']); ?>
+                    <dt class="col-sm-5">Scadenza</dt>
+                    <dd class="col-sm-7 <?= $overdue ? 'text-danger fw-semibold' : '' ?>">
+                        <?= $overdue ? '<i class="bi bi-exclamation-triangle-fill me-1"></i>' : '' ?>
+                        <?= formatDate($ticket['due_date']) ?>
+                    </dd>
                     <?php endif; ?>
                     <dt class="col-sm-5">Creato il</dt><dd class="col-sm-7"><?= formatDate($ticket['created_at']) ?></dd>
                     <dt class="col-sm-5">Aggiornato</dt><dd class="col-sm-7"><?= formatDate($ticket['updated_at']) ?></dd>

@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/modules.php';
+require_once __DIR__ . '/../../includes/mailer.php';
 
 requireLogin();
 if (!isModuleEnabled('tickets')) { header('Location: ' . APP_URL . '/dashboard.php'); exit; }
@@ -39,6 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $codice_concessionario = trim($_POST['codice_concessionario'] ?? '') ?: null;
     $tipo_intervento = $_POST['tipo_intervento'] ?? 'onsite';
     if (!in_array($tipo_intervento, ['onsite','onsite_sostituzione','solo_spedizione'])) $tipo_intervento = 'onsite';
+    $due_date_raw = trim($_POST['due_date'] ?? '');
+    $due_date = $due_date_raw ? date('Y-m-d H:i:s', strtotime($due_date_raw)) : null;
     if (!$title) $errors[] = 'Il titolo è obbligatorio.';
     if (!$description) $errors[] = 'La descrizione è obbligatoria.';
     if (!in_array($priority, ['low','medium','high','urgent'])) $errors[] = 'Priorità non valida.';
@@ -48,10 +51,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$assigned_to && getSetting('auto_assign', '0') === '1') {
             $assigned_to = getAutoAssignee();
         }
-        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, tipo_intervento, status) VALUES (?,?,?,?,?,?,?,?,?,?,'open')");
-        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario, $tipo_intervento]);
+        $stmt = $db->prepare("INSERT INTO tickets (title, description, priority, category_id, created_by, assigned_to, dealer_id, location_id, codice_concessionario, tipo_intervento, due_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,'open')");
+        $stmt->execute([$title, $description, $priority, $category_id, $user['id'], $assigned_to, $dealer_id, $location_id, $codice_concessionario, $tipo_intervento, $due_date]);
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'create', 'ticket', $newId, "Creato ticket ($tipo_intervento): $title");
+        logTicketChange((int)$newId, $user['id'], 'created', '', '', '', "Ticket creato con priorità $priority e tipo $tipo_intervento");
         $ticketUrl = APP_URL . '/modules/tickets/view.php?id=' . $newId;
         $prefix = getTicketPrefix() . '-' . str_pad($newId, 4, '0', STR_PAD_LEFT);
         // Notify admins (excluding the creator if they are admin)
@@ -61,6 +65,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Notify assigned technician
         if ($assigned_to && $assigned_to != $user['id'] && getSetting('notif_ticket_assign', '1') === '1') {
             createNotification($assigned_to, 'assign', 'Ticket assegnato a te: ' . $prefix, $title, 'ticket', $newId, $ticketUrl);
+        }
+        // Email notifications
+        if (getSetting('email_notifications', '0') === '1') {
+            // Email to assigned technician
+            if ($assigned_to) {
+                $techRow = $db->prepare("SELECT email, full_name FROM users WHERE id=?");
+                $techRow->execute([$assigned_to]);
+                $tech = $techRow->fetch();
+                if ($tech) {
+                    $priorityLabel = getPriorityLabel($priority);
+                    $content = '<p>Ciao <strong>' . htmlspecialchars($tech['full_name']) . '</strong>,</p>'
+                        . '<p>Ti è stato assegnato un nuovo ticket:</p>'
+                        . '<table style="border-collapse:collapse;width:100%">'
+                        . '<tr><td style="padding:6px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-weight:600;width:140px">Ticket</td><td style="padding:6px 12px;border:1px solid #e2e8f0">' . htmlspecialchars($prefix) . '</td></tr>'
+                        . '<tr><td style="padding:6px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-weight:600">Titolo</td><td style="padding:6px 12px;border:1px solid #e2e8f0">' . htmlspecialchars($title) . '</td></tr>'
+                        . '<tr><td style="padding:6px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-weight:600">Priorità</td><td style="padding:6px 12px;border:1px solid #e2e8f0">' . htmlspecialchars($priorityLabel) . '</td></tr>'
+                        . '</table>'
+                        . '<p style="margin-top:20px"><a href="' . htmlspecialchars($ticketUrl) . '" style="background:' . htmlspecialchars(getSetting('theme_primary_color','#3b82f6')) . ';color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">Apri Ticket</a></p>';
+                    sendAppEmail($tech['email'], $tech['full_name'], 'Ticket assegnato: ' . $prefix, buildEmailHtml('Nuovo ticket assegnato', $content));
+                }
+            }
         }
         // For solo_spedizione: auto-create a shipping record in sala
         if ($tipo_intervento === 'solo_spedizione' && isModuleEnabled('spedizioni')) {
@@ -256,7 +281,7 @@ include APP_ROOT . '/includes/header.php';
         <i class="bi bi-tags"></i> Classificazione
     </div>
     <div class="row g-3">
-        <div class="col-md-<?= isTechnician() ? '6' : '12' ?>">
+        <div class="col-md-<?= isTechnician() ? '4' : '12' ?>">
             <label class="form-label">Categoria</label>
             <select name="category_id" class="form-select">
                 <option value="">— Nessuna categoria —</option>
@@ -266,7 +291,7 @@ include APP_ROOT . '/includes/header.php';
             </select>
         </div>
         <?php if (isTechnician()): ?>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Assegna a</label>
             <div class="input-group">
                 <select name="assigned_to" class="form-select" id="assignedToSelect">
@@ -280,6 +305,11 @@ include APP_ROOT . '/includes/header.php';
                 </button>
             </div>
             <div class="form-text">Clicca <i class="bi bi-magic"></i> per auto-assegnare al tecnico meno carico.</div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Scadenza (opzionale)</label>
+            <input type="datetime-local" name="due_date" class="form-control" value="<?= h($_POST['due_date'] ?? '') ?>">
+            <div class="form-text">Lascia vuoto se non c'è una scadenza.</div>
         </div>
         <?php endif; ?>
     </div>
