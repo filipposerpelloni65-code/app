@@ -74,14 +74,15 @@ foreach ($speds as $s) {
         $pesoKg   = max(0.1, (float)($s['peso_kg'] ?? 1.0));
         $note     = mb_substr((string)($s['note'] ?? ''), 0, 70);
 
-        // BRT numericSenderReference must be a positive integer ≤ 9999999 (7 digits max per BRT API spec)
-        $numericRef = (int)(microtime(true) * 1000) % 9999999;
+        // BRT numericSenderReference: use spedizione ID (max 7 digits, guaranteed unique per shipment)
+        $numericRef = $sid % 9999999;
 
         $createData = array_merge($consigneeData, [
-            'numberOfParcels'        => $numColli,
-            'weightKG'               => $pesoKg,
-            'numericSenderReference' => $numericRef,
-            'notes'                  => $note,
+            'numberOfParcels'              => $numColli,
+            'weightKG'                     => $pesoKg,
+            'numericSenderReference'       => $numericRef,
+            'alphanumericSenderReference'  => 'SPED-' . $sid,
+            'notes'                        => $note,
         ]);
 
         $apiResult = $brt->createShipment($createData, true);

@@ -57,21 +57,30 @@ if (!$result['success']) {
 
 $tracking = $result['data']['spedizione'] ?? $result['data'] ?? [];
 
-// Auto-update status to consegnata if BRT says delivered
+// Auto-update status based on BRT events
 $eventi = $tracking['eventi']['evento'] ?? [];
 if (!isset($eventi[0])) { $eventi = [$eventi]; } // normalize single evento to array
 $isDelivered = false;
+$isPickedUp  = false;
 foreach ($eventi as $ev) {
-    // BRT event ID for "consegnato" is typically "05"
-    if (isset($ev['id']) && in_array($ev['id'], ['05', '5', '006'])) {
+    $evId = (string)($ev['id'] ?? '');
+    // BRT event IDs: 05/5/006 = consegnato, 01/1 = ritirato dal mittente
+    if (in_array($evId, ['05', '5', '006'], true)) {
         $isDelivered = true;
         break;
+    }
+    if (in_array($evId, ['01', '1'], true)) {
+        $isPickedUp = true;
     }
 }
 if ($isDelivered && $row['status'] !== 'consegnata') {
     $db->prepare("UPDATE spedizioni SET status='consegnata', updated_at=NOW() WHERE id=?")->execute([$id]);
     $user = currentUser();
     logActivity($user['id'], 'auto_update', 'spedizione', $id, 'Status aggiornato a consegnata via BRT tracking');
+} elseif ($isPickedUp && $row['status'] === 'da_spedire') {
+    $db->prepare("UPDATE spedizioni SET status='spedita', updated_at=NOW() WHERE id=?")->execute([$id]);
+    $user = currentUser();
+    logActivity($user['id'], 'auto_update', 'spedizione', $id, 'Status aggiornato a spedita (ritiro BRT confermato)');
 }
 
 echo json_encode(['success' => true, 'data' => $tracking, 'isDelivered' => $isDelivered]);

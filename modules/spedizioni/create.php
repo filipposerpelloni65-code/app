@@ -53,6 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $consigneeZip     = trim($_POST['brt_consignee_zip'] ?? '');
         $consigneeCity    = trim($_POST['brt_consignee_city'] ?? '');
         $consigneeProv    = trim($_POST['brt_consignee_province'] ?? '');
+        $consigneeContact = trim($_POST['brt_consignee_contact'] ?? '');
+        $consigneePhone   = trim($_POST['brt_consignee_phone'] ?? '');
 
         if (!$consigneeName || !$consigneeAddress || !$consigneeZip || !$consigneeCity) {
             $errors[] = 'Compila i campi BRT: Ragione Sociale, Indirizzo, CAP e Città del destinatario.';
@@ -67,6 +69,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             if ($consigneeProv) {
                 $brtData['consigneeProvinceAbbreviation'] = strtoupper(mb_substr($consigneeProv, 0, 2));
+            }
+            if ($consigneeContact) {
+                $brtData['consigneeContactName'] = mb_substr($consigneeContact, 0, 35);
+            }
+            if ($consigneePhone) {
+                $brtData['consigneePhone'] = mb_substr($consigneePhone, 0, 20);
             }
             $brtConsigneeJson = json_encode($brtData, JSON_UNESCAPED_UNICODE);
             if (empty($corriere)) { $corriere = 'BRT'; }
@@ -215,6 +223,14 @@ include APP_ROOT . '/includes/header.php';
                                 <label class="form-label fw-semibold">N° Colli</label>
                                 <input type="number" name="brt_num_parcels" class="form-control" min="1" max="85" value="<?= h($_POST['brt_num_parcels'] ?? '1') ?>">
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Referente Destinatario</label>
+                                <input type="text" name="brt_consignee_contact" class="form-control" maxlength="35" value="<?= h($_POST['brt_consignee_contact'] ?? '') ?>" placeholder="Es. Mario Rossi">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Telefono Destinatario</label>
+                                <input type="text" name="brt_consignee_phone" class="form-control" maxlength="20" value="<?= h($_POST['brt_consignee_phone'] ?? '') ?>" placeholder="Es. 02123456">
+                            </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">Peso (kg)</label>
                                 <input type="number" name="brt_weight_kg" class="form-control" min="0.1" step="0.1" value="<?= h($_POST['brt_weight_kg'] ?? '1.0') ?>">
@@ -237,34 +253,91 @@ include APP_ROOT . '/includes/header.php';
 $extraJs = '<script>
 $(document).ready(function(){
     window.appUrl = "' . APP_URL . '";
+
+    // Dealer → location cascade + BRT auto-fill
     $("#dealerSelect").on("change", function(){
         var did = $(this).val();
         var $loc = $("#locationSelect");
         $loc.html("<option value=\"\">-- Nessuno --</option>");
+        clearBrtFields();
         if (!did) return;
         $.getJSON(window.appUrl + "/api/parts.php?action=dealer_locations&dealer_id=" + did, function(data){
             if (data.success) {
                 $.each(data.data, function(i, l){
-                    $loc.append("<option value=\""+l.id+"\">"+l.name+"</option>");
+                    $loc.append("<option value=\""+l.id+"\" " +
+                        "data-name=\""+(l.name||"")+"\" " +
+                        "data-address=\""+(l.address||"")+"\" " +
+                        "data-city=\""+(l.city||"")+"\" " +
+                        "data-zip=\""+(l.zip||"")+"\" " +
+                        "data-province=\""+(l.province||"")+"\" " +
+                        "data-phone=\""+(l.phone||"")+"\" " +
+                        "data-contact=\""+(l.contact_person||"")+"\">" +
+                        l.name+"</option>");
                 });
+                if (data.data.length === 1) {
+                    $loc.val(data.data[0].id).trigger("change");
+                }
             }
         });
     });
 
+    // Location change → auto-fill BRT fields
+    $("#locationSelect").on("change", function(){
+        var $opt = $(this).find("option:selected");
+        if (!$opt.val()) { clearBrtFields(); return; }
+        if ($("#useBrt").is(":checked")) {
+            fillBrtFromOption($opt);
+        }
+    });
+
+    function clearBrtFields() {
+        if (!$("#brtFields").hasClass("d-none")) {
+            $("input[name=brt_consignee_name]").val("");
+            $("input[name=brt_consignee_address]").val("");
+            $("input[name=brt_consignee_zip]").val("");
+            $("input[name=brt_consignee_city]").val("");
+            $("input[name=brt_consignee_province]").val("");
+            $("input[name=brt_consignee_contact]").val("");
+            $("input[name=brt_consignee_phone]").val("");
+        }
+    }
+
+    function fillBrtFromOption($opt) {
+        var name = $opt.data("name") || "";
+        if (name) $("input[name=brt_consignee_name]").val(name.substring(0,70));
+        var addr = $opt.data("address") || "";
+        if (addr) $("input[name=brt_consignee_address]").val(addr.substring(0,35));
+        var zip = $opt.data("zip") || "";
+        if (zip) $("input[name=brt_consignee_zip]").val(zip.substring(0,9));
+        var city = $opt.data("city") || "";
+        if (city) $("input[name=brt_consignee_city]").val(city.substring(0,35));
+        var prov = $opt.data("province") || "";
+        if (prov) $("input[name=brt_consignee_province]").val(prov.substring(0,2).toUpperCase());
+        var contact = $opt.data("contact") || "";
+        if (contact) $("input[name=brt_consignee_contact]").val(contact.substring(0,35));
+        var phone = $opt.data("phone") || "";
+        if (phone) $("input[name=brt_consignee_phone]").val(phone.substring(0,20));
+    }
+
     // BRT toggle
+    var $brtRequired = function() {
+        return $("#brtFields input[name=brt_consignee_name], #brtFields input[name=brt_consignee_address], #brtFields input[name=brt_consignee_zip], #brtFields input[name=brt_consignee_city]");
+    };
     $("#useBrt").on("change", function(){
         if ($(this).is(":checked")) {
             $("#brtFields").removeClass("d-none");
-            var $req = $("#brtFields input[name=brt_consignee_name], #brtFields input[name=brt_consignee_address], #brtFields input[name=brt_consignee_zip], #brtFields input[name=brt_consignee_city]");
-            $req.prop("required", true);
+            $brtRequired().prop("required", true);
+            // Auto-fill from currently selected location
+            var $opt = $("#locationSelect option:selected");
+            if ($opt.val()) { fillBrtFromOption($opt); }
         } else {
             $("#brtFields").addClass("d-none");
-            $req.prop("required", false);
+            $brtRequired().prop("required", false);
         }
     });
     // Set required on load if checked
     if ($("#useBrt").is(":checked")) {
-        $("#brtFields input[name=brt_consignee_name], #brtFields input[name=brt_consignee_address], #brtFields input[name=brt_consignee_zip], #brtFields input[name=brt_consignee_city]").prop("required", true);
+        $brtRequired().prop("required", true);
     }
 });
 </script>';

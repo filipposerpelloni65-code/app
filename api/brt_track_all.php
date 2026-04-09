@@ -42,10 +42,17 @@ if (!$brt) {
 }
 
 $db   = getDB();
-$rows = $db->query("SELECT id, brt_parcel_id FROM spedizioni WHERE status = 'spedita' AND brt_parcel_id IS NOT NULL AND brt_parcel_id <> ''")->fetchAll();
+// Track both 'da_spedire' (transmitted, awaiting pickup) and 'spedita' (in transit) BRT shipments
+$rows = $db->query("SELECT id, brt_parcel_id, status FROM spedizioni WHERE status IN ('da_spedire','spedita') AND brt_parcel_id IS NOT NULL AND brt_parcel_id <> ''")->fetchAll();
 
 $stats = ['updated' => 0, 'unchanged' => 0, 'errors' => 0, 'total' => count($rows)];
 $userId = $isCron ? 0 : (int)(currentUser()['id'] ?? 0);
+
+// BRT event IDs:
+// 01/1 = pickup/collected from sender → spedita
+// 05/5/006 = delivered to consignee → consegnata
+$pickupEventIds   = ['01', '1'];
+$deliveryEventIds = ['05', '5', '006'];
 
 foreach ($rows as $row) {
     $result = $brt->trackParcel($row['brt_parcel_id']);
@@ -61,16 +68,25 @@ foreach ($rows as $row) {
     }
 
     $isDelivered = false;
+    $isPickedUp  = false;
     foreach ($eventi as $ev) {
-        if (isset($ev['id']) && in_array($ev['id'], ['05', '5', '006'], true)) {
+        $evId = (string)($ev['id'] ?? '');
+        if (in_array($evId, $deliveryEventIds, true)) {
             $isDelivered = true;
             break;
         }
+        if (in_array($evId, $pickupEventIds, true)) {
+            $isPickedUp = true;
+        }
     }
 
-    if ($isDelivered) {
+    if ($isDelivered && $row['status'] !== 'consegnata') {
         $db->prepare("UPDATE spedizioni SET status='consegnata', updated_at=NOW() WHERE id=?")->execute([$row['id']]);
         logActivity($userId, 'auto_update', 'spedizione', (int)$row['id'], 'Status aggiornato a consegnata via brt_track_all');
+        $stats['updated']++;
+    } elseif ($isPickedUp && $row['status'] === 'da_spedire') {
+        $db->prepare("UPDATE spedizioni SET status='spedita', updated_at=NOW() WHERE id=?")->execute([$row['id']]);
+        logActivity($userId, 'auto_update', 'spedizione', (int)$row['id'], 'Status aggiornato a spedita (ritiro BRT confermato)');
         $stats['updated']++;
     } else {
         $stats['unchanged']++;

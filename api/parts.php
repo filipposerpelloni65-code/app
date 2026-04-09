@@ -123,7 +123,7 @@ switch ($action) {
     case 'dealer_locations':
         $dealerId = (int)($_GET['dealer_id'] ?? 0);
         if (!$dealerId) { echo json_encode(['success'=>false,'error'=>'Missing dealer_id']); break; }
-        $rows = $db->prepare("SELECT id, name FROM dealer_locations WHERE dealer_id=? AND active=1 ORDER BY name");
+        $rows = $db->prepare("SELECT id, name, address, city, zip, province, phone, contact_person FROM dealer_locations WHERE dealer_id=? AND active=1 ORDER BY name");
         $rows->execute([$dealerId]);
         echo json_encode(['success' => true, 'data' => $rows->fetchAll()]);
         break;

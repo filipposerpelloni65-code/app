@@ -19,7 +19,9 @@ $stmt = $db->prepare("
         t.title AS ticket_title,
         spr.id AS request_id, spr.quantity AS req_quantity, sp.name AS part_name, sp.sku AS part_sku,
         d.name AS dealer_name, d.city AS dealer_city,
-        dl.name AS location_name,
+        dl.name AS location_name, dl.address AS location_address, dl.city AS location_city,
+        dl.zip AS location_zip, dl.province AS location_province, dl.phone AS location_phone,
+        dl.contact_person AS location_contact,
         uc.full_name AS creator_name
     FROM spedizioni s
     LEFT JOIN tickets t ON s.ticket_id = t.id
@@ -79,7 +81,7 @@ include APP_ROOT . '/includes/header.php';
         </a>
         <?php endif; ?>
         <?php endif; ?>
-        <?php if (in_array($s['status'], ['bozza']) && isTechnician()): ?>
+        <?php if (in_array($s['status'], ['bozza','da_spedire']) && isTechnician()): ?>
         <a href="<?= APP_URL ?>/modules/spedizioni/bordero.php" class="btn btn-warning btn-sm">
             <i class="bi bi-send me-1"></i>Vai a Gestione Bordero
         </a>
@@ -181,9 +183,34 @@ include APP_ROOT . '/includes/header.php';
             <div class="card-body">
                 <?php if ($s['dealer_name']): ?><div class="fw-semibold"><?= h($s['dealer_name']) ?></div><?php endif; ?>
                 <?php if ($s['location_name']): ?><div class="text-muted small"><?= h($s['location_name']) ?></div><?php endif; ?>
-                <?php if ($s['dealer_city']): ?><div class="text-muted small"><i class="bi bi-geo-alt me-1"></i><?= h($s['dealer_city']) ?></div><?php endif; ?>
+                <?php if ($s['location_address']): ?><div class="text-muted small"><i class="bi bi-geo-alt me-1"></i><?= h($s['location_address']) ?></div><?php endif; ?>
+                <?php
+                $locationCityLine = trim(($s['location_zip'] ? $s['location_zip'] . ' ' : '') . ($s['location_city'] ?: $s['dealer_city']) . ($s['location_province'] ? ' (' . $s['location_province'] . ')' : ''));
+                if ($locationCityLine): ?>
+                <div class="text-muted small"><?= h($locationCityLine) ?></div>
+                <?php endif; ?>
+                <?php if ($s['location_contact']): ?><div class="text-muted small"><i class="bi bi-person me-1"></i><?= h($s['location_contact']) ?></div><?php endif; ?>
+                <?php if ($s['location_phone']): ?><div class="text-muted small"><i class="bi bi-telephone me-1"></i><?= h($s['location_phone']) ?></div><?php endif; ?>
                 <?php if ($s['dealer_id']): ?>
                 <a href="<?= APP_URL ?>/modules/dealers/view.php?id=<?= $s['dealer_id'] ?>" class="btn btn-sm btn-outline-success mt-2"><i class="bi bi-arrow-right me-1"></i>Vedi Concessionario</a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- BRT Dati Destinatario (bozza, non ancora trasmessa) -->
+        <?php if (!empty($s['brt_consignee_json']) && empty($s['transmitted_at'])): ?>
+        <?php $bcd = json_decode($s['brt_consignee_json'], true) ?? []; ?>
+        <div class="card border-warning border-opacity-50 shadow-sm mb-4">
+            <div class="card-header bg-warning bg-opacity-10"><h6 class="mb-0 text-warning"><i class="bi bi-truck me-2"></i>Dati BRT destinatario <small class="fw-normal">(da trasmettere)</small></h6></div>
+            <div class="card-body small">
+                <div class="fw-semibold"><?= h($bcd['consigneeCompanyName'] ?? '') ?></div>
+                <?php if (!empty($bcd['consigneeContactName'])): ?><div class="text-muted"><i class="bi bi-person me-1"></i><?= h($bcd['consigneeContactName']) ?></div><?php endif; ?>
+                <div class="text-muted"><?= h($bcd['consigneeAddress'] ?? '') ?></div>
+                <div class="text-muted"><?= h(trim(($bcd['consigneeZIPCode'] ?? '') . ' ' . ($bcd['consigneeCity'] ?? '') . (isset($bcd['consigneeProvinceAbbreviation']) ? ' ('.$bcd['consigneeProvinceAbbreviation'].')' : ''))) ?></div>
+                <?php if (!empty($bcd['consigneePhone'])): ?><div class="text-muted"><i class="bi bi-telephone me-1"></i><?= h($bcd['consigneePhone']) ?></div><?php endif; ?>
+                <?php if (isTechnician()): ?>
+                <a href="<?= APP_URL ?>/modules/spedizioni/bordero.php" class="btn btn-warning btn-sm mt-2"><i class="bi bi-send me-1"></i>Trasmetti via Bordero</a>
                 <?php endif; ?>
             </div>
         </div>
