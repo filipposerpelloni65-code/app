@@ -441,6 +441,48 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
         </div>
         <?php endif; ?>
 
+        <!-- Storico Modifiche (Changelog) -->
+        <?php if (isTechnician()): ?>
+        <?php
+        $changelog = [];
+        try {
+            $clStmt = $db->prepare("SELECT cl.*, u.full_name AS user_name FROM ticket_changelog cl LEFT JOIN users u ON cl.user_id=u.id WHERE cl.ticket_id=? ORDER BY cl.created_at DESC LIMIT 100");
+            $clStmt->execute([$id]);
+            $changelog = $clStmt->fetchAll();
+        } catch (Exception $e) { /* table may not exist yet */ }
+        ?>
+        <div class="card border-0 shadow-sm mb-4" id="changelog">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-clock-history me-2 text-secondary"></i>Storico Modifiche (<?= count($changelog) ?>)</h6>
+            </div>
+            <?php if ($changelog): ?>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>Data</th><th>Utente</th><th>Azione</th><th>Campo</th><th>Da</th><th>A / Note</th></tr></thead>
+                    <tbody>
+                    <?php
+                    $actionLabels = ['created'=>'Creato','edited'=>'Modificato','status_change'=>'Stato','comment'=>'Commento','assigned'=>'Assegnato'];
+                    foreach ($changelog as $cl):
+                    $actionLabel = $actionLabels[$cl['action']] ?? h($cl['action']);
+                    ?>
+                    <tr>
+                        <td class="small text-nowrap text-muted"><?= formatDate($cl['created_at']) ?></td>
+                        <td class="small"><?= $cl['user_name'] ? h($cl['user_name']) : '<span class="text-muted">Sistema</span>' ?></td>
+                        <td class="small"><span class="badge bg-secondary"><?= $actionLabel ?></span></td>
+                        <td class="small text-muted"><?= $cl['field'] ? h($cl['field']) : '-' ?></td>
+                        <td class="small text-muted"><?= $cl['old_value'] !== null ? h($cl['old_value']) : '-' ?></td>
+                        <td class="small"><?= $cl['new_value'] !== null ? h($cl['new_value']) : ($cl['note'] ? h(substr($cl['note'],0,100)) : '-') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="card-body text-muted small">Nessuna modifica registrata.</div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <!-- Spare Parts Requests -->
         <?php if ($partsRequests): ?>
         <div class="card border-0 shadow-sm mb-4">
@@ -633,6 +675,14 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
                     <?php endif; ?>
                     <?php if ($ticket['location_name']): ?>
                     <dt class="col-sm-5">Punto Vendita</dt><dd class="col-sm-7"><?= h($ticket['location_name']) ?></dd>
+                    <?php endif; ?>
+                    <?php if (!empty($ticket['due_date'])): ?>
+                    <?php $overdue = strtotime($ticket['due_date']) < time() && !in_array($ticket['status'], ['resolved','closed']); ?>
+                    <dt class="col-sm-5">Scadenza</dt>
+                    <dd class="col-sm-7 <?= $overdue ? 'text-danger fw-semibold' : '' ?>">
+                        <?= $overdue ? '<i class="bi bi-exclamation-triangle-fill me-1"></i>' : '' ?>
+                        <?= formatDate($ticket['due_date']) ?>
+                    </dd>
                     <?php endif; ?>
                     <dt class="col-sm-5">Creato il</dt><dd class="col-sm-7"><?= formatDate($ticket['created_at']) ?></dd>
                     <dt class="col-sm-5">Aggiornato</dt><dd class="col-sm-7"><?= formatDate($ticket['updated_at']) ?></dd>

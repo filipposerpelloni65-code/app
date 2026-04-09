@@ -160,6 +160,11 @@ include APP_ROOT . '/includes/header.php';
             <option value="solo_spedizione" <?= $curTipo==='solo_spedizione'?'selected':'' ?>>Solo Spedizione</option>
         </select>
     </div>
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Scadenza (opzionale)</label>
+        <?php $dueDateVal = !empty($ticket['due_date']) ? date('Y-m-d\TH:i', strtotime($ticket['due_date'])) : ''; ?>
+        <input type="datetime-local" name="due_date" class="form-control" value="<?= h($dueDateVal) ?>">
+    </div>
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salva Modifiche</button>
         <a href="<?= APP_URL ?>/modules/tickets/view.php?id=<?= $id ?>" class="btn btn-light">Annulla</a>
