@@ -82,6 +82,8 @@ $companyName    = getSetting('company_name', APP_NAME);
 $companyAddress = getSetting('company_address', '');
 $companyCity    = getSetting('company_city', '');
 $companyVat     = getSetting('company_vat', '');
+$brtCodiceCliente = getSetting('brt_sender_customer_code', '');
+$brtDeposito      = getSetting('brt_departure_depot', '');
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -100,9 +102,9 @@ $companyVat     = getSetting('company_vat', '');
         .no-print { display: none !important; }
         .page-break { page-break-before: always; }
     }
-    @page { size: A4; margin: 15mm 10mm; }
+    @page { size: A4 landscape; margin: 12mm 10mm; }
 
-    .bordero-page { background: #fff; max-width: 210mm; margin: 0 auto; padding: 15mm 10mm; }
+    .bordero-page { background: #fff; max-width: 297mm; margin: 0 auto; padding: 12mm 10mm; }
     .header-logo { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
     .header-sub  { font-size: 0.8rem; color: #64748b; }
     .doc-title   { font-size: 1.2rem; font-weight: 700; border-bottom: 2px solid #1e293b; padding-bottom: 6px; margin-bottom: 12px; }
@@ -153,6 +155,8 @@ $companyVat     = getSetting('company_vat', '');
             </div>
             <div class="small text-muted">Data: <strong><?= $borderoDate ?></strong></div>
             <?php if ($borderoId): ?><div class="small text-muted">Bordero n°: <strong><?= $borderoId ?></strong></div><?php endif; ?>
+            <?php if ($brtCodiceCliente && $brtCodiceCliente !== '0'): ?><div class="small text-muted">Cod. Cliente BRT: <strong class="text-primary"><?= h($brtCodiceCliente) ?></strong></div><?php endif; ?>
+            <?php if ($brtDeposito && $brtDeposito !== '0'): ?><div class="small text-muted">N° Deposito: <strong class="text-primary"><?= h($brtDeposito) ?></strong></div><?php endif; ?>
             <?php if ($borderoNote): ?><div class="small text-muted">Note: <?= h($borderoNote) ?></div><?php endif; ?>
         </div>
     </div>
