@@ -18,8 +18,10 @@ $stmt = $db->prepare("
     SELECT s.*,
         t.title AS ticket_title,
         spr.id AS request_id, spr.quantity AS req_quantity, sp.name AS part_name, sp.sku AS part_sku,
-        d.name AS dealer_name, d.city AS dealer_city,
-        dl.name AS location_name,
+        d.name AS dealer_name, d.city AS dealer_city, d.address AS dealer_address,
+        dl.name AS location_name, dl.address AS location_address, dl.city AS location_city,
+        dl.zip AS location_zip, dl.province AS location_province,
+        dl.phone AS location_phone, dl.email AS location_email,
         uc.full_name AS creator_name
     FROM spedizioni s
     LEFT JOIN tickets t ON s.ticket_id = t.id
@@ -130,6 +132,40 @@ include APP_ROOT . '/includes/header.php';
             </div>
         </div>
 
+        <?php
+        $brtDest = !empty($s['brt_consignee_json']) ? (json_decode($s['brt_consignee_json'], true) ?? []) : [];
+        if ($brtDest):
+        ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-geo-alt-fill me-2 text-primary"></i>Dati BRT Destinatario</h6>
+                <?php if (empty($s['brt_parcel_id']) && isTechnician()): ?>
+                <a href="<?= APP_URL ?>/modules/spedizioni/edit.php?id=<?= $id ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica</a>
+                <?php else: ?>
+                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Trasmessa</span>
+                <?php endif; ?>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-bordered mb-0">
+                    <tbody>
+                        <tr><td class="fw-semibold bg-light" style="width:35%">Ragione Sociale</td><td><?= h($brtDest['consigneeCompanyName'] ?? '') ?></td></tr>
+                        <tr><td class="fw-semibold bg-light">Indirizzo</td><td><?= h($brtDest['consigneeAddress'] ?? '') ?></td></tr>
+                        <tr><td class="fw-semibold bg-light">CAP / Città</td><td><?= h($brtDest['consigneeZIPCode'] ?? '') ?> <?= h($brtDest['consigneeCity'] ?? '') ?> <?= h($brtDest['consigneeProvinceAbbreviation'] ?? '') ?></td></tr>
+                        <?php if (!empty($brtDest['consigneeContactName'])): ?>
+                        <tr><td class="fw-semibold bg-light">Referente</td><td><?= h($brtDest['consigneeContactName']) ?></td></tr>
+                        <?php endif; ?>
+                        <?php if (!empty($brtDest['consigneeTelephone'])): ?>
+                        <tr><td class="fw-semibold bg-light">Telefono</td><td><?= h($brtDest['consigneeTelephone']) ?></td></tr>
+                        <?php endif; ?>
+                        <?php if (!empty($brtDest['consigneeEMail'])): ?>
+                        <tr><td class="fw-semibold bg-light">Email notifica</td><td><?= h($brtDest['consigneeEMail']) ?> <span class="badge bg-info text-dark">Notifiche attive</span></td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if ($hasBrt && $brtApiReady): ?>
         <!-- BRT Tracking Panel -->
         <div class="card border-0 shadow-sm mb-4" id="brtTrackingCard">
@@ -180,8 +216,18 @@ include APP_ROOT . '/includes/header.php';
             <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-shop me-2 text-success"></i>Destinatario</h6></div>
             <div class="card-body">
                 <?php if ($s['dealer_name']): ?><div class="fw-semibold"><?= h($s['dealer_name']) ?></div><?php endif; ?>
-                <?php if ($s['location_name']): ?><div class="text-muted small"><?= h($s['location_name']) ?></div><?php endif; ?>
-                <?php if ($s['dealer_city']): ?><div class="text-muted small"><i class="bi bi-geo-alt me-1"></i><?= h($s['dealer_city']) ?></div><?php endif; ?>
+                <?php if ($s['location_name']): ?><div class="text-muted small fw-semibold"><?= h($s['location_name']) ?></div><?php endif; ?>
+                <?php
+                $locAddr = trim(($s['location_address'] ?? '') ?: ($s['dealer_address'] ?? ''));
+                $locCity = trim(($s['location_city'] ?? '') ?: ($s['dealer_city'] ?? ''));
+                $locZip  = $s['location_zip'] ?? '';
+                $locProv = $s['location_province'] ?? '';
+                if ($locAddr): ?><div class="text-muted small"><i class="bi bi-geo-alt me-1"></i><?= h($locAddr) ?></div><?php endif; ?>
+                <?php if ($locCity || $locZip): ?>
+                <div class="text-muted small"><?= h($locZip) ?> <?= h($locCity) ?><?= $locProv ? ' ('.h($locProv).')' : '' ?></div>
+                <?php endif; ?>
+                <?php if ($s['location_phone']): ?><div class="text-muted small"><i class="bi bi-telephone me-1"></i><?= h($s['location_phone']) ?></div><?php endif; ?>
+                <?php if ($s['location_email']): ?><div class="text-muted small"><i class="bi bi-envelope me-1"></i><?= h($s['location_email']) ?></div><?php endif; ?>
                 <?php if ($s['dealer_id']): ?>
                 <a href="<?= APP_URL ?>/modules/dealers/view.php?id=<?= $s['dealer_id'] ?>" class="btn btn-sm btn-outline-success mt-2"><i class="bi bi-arrow-right me-1"></i>Vedi Concessionario</a>
                 <?php endif; ?>
@@ -227,7 +273,22 @@ $extraJs = '<script>
             }
 
             if (data.isDelivered) {
-                html += \'<div class="alert alert-success py-2 mb-3"><i class="bi bi-check-circle me-2"></i><strong>Consegnato!</strong></div>\';
+                html += \'<div class="alert alert-success py-2 mb-3"><i class="bi bi-check-circle me-2"></i><strong>Consegnato!</strong>\';
+                var dc = t.dati_consegna || {};
+                if (dc.data_consegna_merce) {
+                    html += \' il \' + dc.data_consegna_merce;
+                    if (dc.ora_consegna_merce) html += \' alle \' + dc.ora_consegna_merce;
+                    if (dc.firmatario_consegna) html += \' — Ricevuto da: <em>\' + dc.firmatario_consegna + \'</em>\';
+                }
+                html += \'</div>\';
+            } else if (data.isInTransit) {
+                html += \'<div class="alert alert-info py-2 mb-3"><i class="bi bi-truck me-2"></i><strong>In transito</strong>\';
+                var dc = t.dati_consegna || {};
+                if (dc.data_teorica_consegna) {
+                    html += \' — Consegna prevista: \' + dc.data_teorica_consegna;
+                    if (dc.ora_teorica_consegna_da) html += \' \' + dc.ora_teorica_consegna_da + \'-\' + (dc.ora_teorica_consegna_a || \'\');
+                }
+                html += \'</div>\';
             }
 
             // Events

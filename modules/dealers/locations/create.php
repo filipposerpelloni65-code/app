@@ -29,6 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $code           = trim($_POST['code'] ?? '');
     $address        = trim($_POST['address'] ?? '');
     $city           = trim($_POST['city'] ?? '');
+    $zip            = trim($_POST['zip'] ?? '');
+    $province       = strtoupper(trim($_POST['province'] ?? ''));
     $phone          = trim($_POST['phone'] ?? '');
     $email          = trim($_POST['email'] ?? '');
     $contact_person = trim($_POST['contact_person'] ?? '');
@@ -41,8 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Email non valida.';
 
     if (!$errors) {
-        $stmt = $db->prepare("INSERT INTO dealer_locations (dealer_id, name, code, address, city, phone, email, contact_person, active, notes, codice_aams, id_punto_vendita) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-        $stmt->execute([$dealerId, $name, $code, $address, $city, $phone, $email, $contact_person, $active, $notes, $codice_aams ?: null, $id_punto_vendita ?: null]);
+        $stmt = $db->prepare("INSERT INTO dealer_locations (dealer_id, name, code, address, city, zip, province, phone, email, contact_person, active, notes, codice_aams, id_punto_vendita) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([$dealerId, $name, $code, $address, $city, $zip ?: null, $province ?: null, $phone, $email, $contact_person, $active, $notes, $codice_aams ?: null, $id_punto_vendita ?: null]);
         $newId = $db->lastInsertId();
         logActivity($user['id'], 'create', 'dealer_location', $newId, "Creato punto vendita: $name");
         header('Location: ' . APP_URL . '/modules/dealers/view.php?id=' . $dealerId . '&updated=1');
@@ -87,11 +89,19 @@ include APP_ROOT . '/includes/header.php';
         <input type="text" name="address" class="form-control" value="<?= h($_POST['address'] ?? '') ?>">
     </div>
     <div class="row g-3 mb-3">
-        <div class="col-md-6">
+        <div class="col-md-5">
             <label class="form-label fw-semibold">Città</label>
             <input type="text" name="city" class="form-control" value="<?= h($_POST['city'] ?? '') ?>">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">CAP</label>
+            <input type="text" name="zip" class="form-control" maxlength="10" value="<?= h($_POST['zip'] ?? '') ?>" placeholder="Es. 20100">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold">Prov.</label>
+            <input type="text" name="province" class="form-control text-uppercase" maxlength="2" value="<?= h($_POST['province'] ?? '') ?>" placeholder="MI">
+        </div>
+        <div class="col-md-2">
             <label class="form-label fw-semibold">Referente</label>
             <input type="text" name="contact_person" class="form-control" value="<?= h($_POST['contact_person'] ?? '') ?>">
         </div>

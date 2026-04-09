@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/modules.php';
+require_once __DIR__ . '/../../includes/brt_api.php';
 
 requireRole('admin', 'technician');
 if (!isModuleEnabled('spedizioni')) { header('Location: ' . APP_URL . '/dashboard.php'); exit; }
@@ -37,6 +38,7 @@ $errors = [];
 $tickets = $db->query("SELECT id, title FROM tickets WHERE status NOT IN ('closed') ORDER BY id DESC LIMIT 200")->fetchAll();
 $partRequests = $db->query("SELECT spr.id, sp.name AS part_name, spr.quantity FROM spare_parts_requests spr JOIN spare_parts sp ON spr.part_id=sp.id WHERE spr.status IN ('approved','pending') ORDER BY spr.id DESC LIMIT 200")->fetchAll();
 $dealers = $db->query("SELECT id, name FROM dealers WHERE active=1 ORDER BY name")->fetchAll();
+$brtAvailable = (getBrtApi() !== null);
 $locations = [];
 if ($s['dealer_id']) {
     $lStmt = $db->prepare("SELECT id, name FROM dealer_locations WHERE dealer_id=? AND active=1 ORDER BY name");
@@ -57,12 +59,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $note         = trim($_POST['note'] ?? '');
     $dataSped     = trim($_POST['data_spedizione'] ?? '') ?: null;
     $dataConsegna = trim($_POST['data_consegna_prevista'] ?? '') ?: null;
+    $numColli     = max(1, (int)($_POST['brt_num_parcels'] ?? $s['num_colli'] ?? 1));
+    $pesoKg       = max(0.1, (float)($_POST['brt_weight_kg'] ?? $s['peso_kg'] ?? 1.0));
 
     if (!in_array($status, ['bozza','da_spedire','spedita','consegnata','annullata'])) { $errors[] = 'Stato non valido.'; }
 
+    // Update BRT consignee data if form submitted (only when not yet transmitted)
+    $brtConsigneeJson = $s['brt_consignee_json'];
+    $canEditBrt = empty($s['brt_parcel_id']); // can only edit if not yet transmitted
+    if ($canEditBrt && isset($_POST['update_brt_data'])) {
+        $cName    = trim($_POST['brt_consignee_name'] ?? '');
+        $cAddress = trim($_POST['brt_consignee_address'] ?? '');
+        $cZip     = trim($_POST['brt_consignee_zip'] ?? '');
+        $cCity    = trim($_POST['brt_consignee_city'] ?? '');
+        $cProv    = trim($_POST['brt_consignee_province'] ?? '');
+        $cContact = trim($_POST['brt_consignee_contact'] ?? '');
+        $cPhone   = trim($_POST['brt_consignee_phone'] ?? '');
+        $cEmail   = trim($_POST['brt_consignee_email'] ?? '');
+        if ($cName && $cAddress && $cZip && $cCity) {
+            $brtData = [
+                'consigneeCompanyName'                  => mb_substr($cName, 0, 70),
+                'consigneeAddress'                      => mb_substr($cAddress, 0, 35),
+                'consigneeZIPCode'                      => mb_substr($cZip, 0, 9),
+                'consigneeCity'                         => mb_substr($cCity, 0, 35),
+                'consigneeCountryAbbreviationISOAlpha2' => 'IT',
+            ];
+            if ($cProv)    $brtData['consigneeProvinceAbbreviation'] = strtoupper(mb_substr($cProv, 0, 2));
+            if ($cContact) $brtData['consigneeContactName']          = mb_substr($cContact, 0, 35);
+            if ($cPhone)   $brtData['consigneeTelephone']            = mb_substr($cPhone, 0, 20);
+            if ($cEmail) {
+                $brtData['consigneeEMail']  = mb_substr($cEmail, 0, 80);
+                $brtData['isAlertRequired'] = '1';
+            }
+            $brtConsigneeJson = json_encode($brtData, JSON_UNESCAPED_UNICODE);
+            if (empty($corriere)) $corriere = 'BRT';
+        }
+    }
+
     if (!$errors) {
-        $db->prepare("UPDATE spedizioni SET tracking_number=?, corriere=?, status=?, ticket_id=?, spare_parts_request_id=?, dealer_id=?, location_id=?, note=?, data_spedizione=?, data_consegna_prevista=?, updated_at=NOW() WHERE id=?")
-           ->execute([$tracking ?: null, $corriere ?: null, $status, $ticketId, $sprId, $dealerId, $locationId, $note ?: null, $dataSped, $dataConsegna, $id]);
+        $db->prepare("UPDATE spedizioni SET tracking_number=?, corriere=?, status=?, ticket_id=?, spare_parts_request_id=?, dealer_id=?, location_id=?, note=?, data_spedizione=?, data_consegna_prevista=?, brt_consignee_json=?, num_colli=?, peso_kg=?, updated_at=NOW() WHERE id=?")
+           ->execute([$tracking ?: null, $corriere ?: null, $status, $ticketId, $sprId, $dealerId, $locationId, $note ?: null, $dataSped, $dataConsegna, $brtConsigneeJson, $numColli, $pesoKg, $id]);
         logActivity($user['id'], 'edit', 'spedizione', $id, "Modificata spedizione #$id -> $status");
         header('Location: ' . APP_URL . '/modules/spedizioni/view.php?id=' . $id . '&updated=1');
         exit;
@@ -79,6 +115,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $s['note']             = $note;
     $s['data_spedizione']  = $dataSped;
     $s['data_consegna_prevista'] = $dataConsegna;
+    $s['num_colli']        = $numColli;
+    $s['peso_kg']          = $pesoKg;
 }
 
 include APP_ROOT . '/includes/header.php';
@@ -170,7 +208,92 @@ include APP_ROOT . '/includes/header.php';
                     <label class="form-label fw-semibold">Note</label>
                     <textarea name="note" class="form-control" rows="3"><?= h($s['note'] ?? '') ?></textarea>
                 </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">N° Colli</label>
+                    <input type="number" name="brt_num_parcels" class="form-control" min="1" max="30" value="<?= h($s['num_colli'] ?? 1) ?>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Peso (kg)</label>
+                    <input type="number" name="brt_weight_kg" class="form-control" min="0.1" step="0.1" value="<?= h($s['peso_kg'] ?? '1.0') ?>">
+                </div>
             </div>
+
+            <?php
+            $existingBrt = !empty($s['brt_consignee_json']) ? (json_decode($s['brt_consignee_json'], true) ?? []) : [];
+            $canEditBrt  = empty($s['brt_parcel_id']);
+            ?>
+            <?php if ($canEditBrt): ?>
+            <!-- ── BRT Dati Destinatario ──────────────────────────────────────── -->
+            <hr class="my-4">
+            <div class="card border-primary border-opacity-25 mb-3">
+                <div class="card-header bg-primary bg-opacity-10">
+                    <h6 class="mb-0 text-primary"><i class="bi bi-truck me-2"></i>Dati Destinatario BRT
+                        <small class="text-muted fw-normal ms-2">(modificabili fino alla trasmissione)</small>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <input type="hidden" name="update_brt_data" value="1">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Ragione Sociale Destinatario</label>
+                            <input type="text" name="brt_consignee_name" class="form-control" maxlength="70" value="<?= h($existingBrt['consigneeCompanyName'] ?? '') ?>" placeholder="Es. Mario Rossi S.r.l.">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Indirizzo</label>
+                            <input type="text" name="brt_consignee_address" class="form-control" maxlength="35" value="<?= h($existingBrt['consigneeAddress'] ?? '') ?>" placeholder="Es. Via Roma 1">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">CAP</label>
+                            <input type="text" name="brt_consignee_zip" class="form-control" maxlength="9" value="<?= h($existingBrt['consigneeZIPCode'] ?? '') ?>" placeholder="Es. 20100">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold">Città</label>
+                            <input type="text" name="brt_consignee_city" class="form-control" maxlength="35" value="<?= h($existingBrt['consigneeCity'] ?? '') ?>" placeholder="Es. MILANO">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Provincia</label>
+                            <input type="text" name="brt_consignee_province" class="form-control text-uppercase" maxlength="2" value="<?= h($existingBrt['consigneeProvinceAbbreviation'] ?? '') ?>" placeholder="MI">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Nome Referente</label>
+                            <input type="text" name="brt_consignee_contact" class="form-control" maxlength="35" value="<?= h($existingBrt['consigneeContactName'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Telefono</label>
+                            <input type="text" name="brt_consignee_phone" class="form-control" maxlength="20" value="<?= h($existingBrt['consigneeTelephone'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Email notifica</label>
+                            <input type="email" name="brt_consignee_email" class="form-control" maxlength="80" value="<?= h($existingBrt['consigneeEMail'] ?? '') ?>">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php elseif (!empty($existingBrt)): ?>
+            <hr class="my-4">
+            <div class="card border-secondary border-opacity-25 mb-3">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0 text-muted"><i class="bi bi-truck me-2"></i>Dati Destinatario BRT
+                        <span class="badge bg-success ms-2">Trasmessa</span>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 small">
+                        <div class="col-md-6"><strong>Destinatario:</strong> <?= h($existingBrt['consigneeCompanyName'] ?? '') ?></div>
+                        <div class="col-md-6"><strong>Indirizzo:</strong> <?= h($existingBrt['consigneeAddress'] ?? '') ?></div>
+                        <div class="col-md-4"><strong>CAP/Città:</strong> <?= h($existingBrt['consigneeZIPCode'] ?? '') ?> <?= h($existingBrt['consigneeCity'] ?? '') ?> <?= h($existingBrt['consigneeProvinceAbbreviation'] ?? '') ?></div>
+                        <?php if (!empty($existingBrt['consigneeContactName'])): ?>
+                        <div class="col-md-4"><strong>Referente:</strong> <?= h($existingBrt['consigneeContactName']) ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($existingBrt['consigneeEMail'])): ?>
+                        <div class="col-md-4"><strong>Email:</strong> <?= h($existingBrt['consigneeEMail']) ?></div>
+                        <?php endif; ?>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0"><i class="bi bi-lock me-1"></i>Dati non modificabili dopo la trasmissione a BRT.</p>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <div class="mt-4 d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Salva Modifiche</button>
@@ -184,15 +307,34 @@ include APP_ROOT . '/includes/header.php';
 $extraJs = '<script>
 $(document).ready(function(){
     window.appUrl = "' . APP_URL . '";
+    var locationData = {};
+
+    // Pre-load locations for current dealer on page load
+    var initDid = $("#dealerSelect").val();
+    if (initDid) {
+        $.getJSON(window.appUrl + "/api/parts.php?action=dealer_locations&dealer_id=" + initDid, function(data){
+            if (data.success) {
+                var selLid = ' . (int)($s['location_id'] ?? 0) . ';
+                $.each(data.data, function(i, l){
+                    var sel = (l.id == selLid) ? " selected" : "";
+                    $("#locationSelect").append("<option value=\""+l.id+"\""+sel+">"+l.name+"</option>");
+                    locationData[l.id] = l;
+                });
+            }
+        });
+    }
+
     $("#dealerSelect").on("change", function(){
         var did = $(this).val();
         var $loc = $("#locationSelect");
         $loc.html("<option value=\"\">-- Nessuno --</option>");
+        locationData = {};
         if (!did) return;
         $.getJSON(window.appUrl + "/api/parts.php?action=dealer_locations&dealer_id=" + did, function(data){
             if (data.success) {
                 $.each(data.data, function(i, l){
                     $loc.append("<option value=\""+l.id+"\">"+l.name+"</option>");
+                    locationData[l.id] = l;
                 });
             }
         });
