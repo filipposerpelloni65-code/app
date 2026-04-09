@@ -320,24 +320,24 @@ $(document).ready(function(){
     }
 
     // BRT toggle
-    var $brtRequired = function() {
+    var getBrtRequiredFields = function() {
         return $("#brtFields input[name=brt_consignee_name], #brtFields input[name=brt_consignee_address], #brtFields input[name=brt_consignee_zip], #brtFields input[name=brt_consignee_city]");
     };
     $("#useBrt").on("change", function(){
         if ($(this).is(":checked")) {
             $("#brtFields").removeClass("d-none");
-            $brtRequired().prop("required", true);
+            getBrtRequiredFields().prop("required", true);
             // Auto-fill from currently selected location
             var $opt = $("#locationSelect option:selected");
             if ($opt.val()) { fillBrtFromOption($opt); }
         } else {
             $("#brtFields").addClass("d-none");
-            $brtRequired().prop("required", false);
+            getBrtRequiredFields().prop("required", false);
         }
     });
     // Set required on load if checked
     if ($("#useBrt").is(":checked")) {
-        $brtRequired().prop("required", true);
+        getBrtRequiredFields().prop("required", true);
     }
 });
 </script>';

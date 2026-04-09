@@ -74,8 +74,9 @@ foreach ($speds as $s) {
         $pesoKg   = max(0.1, (float)($s['peso_kg'] ?? 1.0));
         $note     = mb_substr((string)($s['note'] ?? ''), 0, 70);
 
-        // BRT numericSenderReference: use spedizione ID (max 7 digits, guaranteed unique per shipment)
-        $numericRef = $sid % 9999999;
+        // BRT numericSenderReference: use spedizione ID directly (max 7 digits per BRT spec).
+        // IDs beyond 9999999 get the high bits truncated; alphanumericSenderReference preserves the full ID.
+        $numericRef = $sid <= 9999999 ? $sid : ($sid % 9999999 ?: 1);
 
         $createData = array_merge($consigneeData, [
             'numberOfParcels'              => $numColli,
