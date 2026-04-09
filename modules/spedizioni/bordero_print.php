@@ -74,8 +74,9 @@ if ($ids) {
     ")->fetchAll();
 }
 
-$totalColli = array_sum(array_column($spedizioni, 'num_colli'));
-$totalPeso  = array_sum(array_column($spedizioni, 'peso_kg'));
+$totalColli      = array_sum(array_column($spedizioni, 'num_colli'));
+$totalPeso       = array_sum(array_column($spedizioni, 'peso_kg'));
+$totalTransmitted = count(array_filter($spedizioni, fn($s) => !empty($s['brt_parcel_id'])));
 
 $companyName    = getSetting('company_name', APP_NAME);
 $companyAddress = getSetting('company_address', '');
@@ -178,7 +179,7 @@ $companyVat     = getSetting('company_vat', '');
         </div>
         <div class="col-3">
             <div class="card border p-2 text-center">
-                <div style="font-size:1.4rem;font-weight:700;color:#8b5cf6"><?= count(array_filter($spedizioni, fn($s) => !empty($s['brt_parcel_id']))) ?></div>
+                <div style="font-size:1.4rem;font-weight:700;color:#8b5cf6"><?= $totalTransmitted ?></div>
                 <div class="text-muted" style="font-size:.7rem">TRASMESSE BRT</div>
             </div>
         </div>
