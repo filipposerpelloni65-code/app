@@ -358,6 +358,7 @@ window.ticketPrefix = <?= json_encode(getTicketPrefix()) ?>;
     </div>
 </div>
 <?php endif; ?>
+<!-- ============================================================
      Quick Create Ticket Modal
      ============================================================ -->
 <div class="modal fade" id="quickCreateTicketModal" tabindex="-1" aria-labelledby="quickCreateTicketModalLabel" aria-hidden="true">
