@@ -31,6 +31,10 @@ class BrtApi
      * @param array  $data         Fields matching createData (required: consigneeCompanyName,
      *                             consigneeAddress, consigneeZIPCode, consigneeCity,
      *                             consigneeCountryAbbreviationISOAlpha2, numberOfParcels, weightKG)
+     *                             Optional BRT fields: consigneeContactName, consigneeTelephone,
+     *                             consigneeEMail, consigneeMobilePhoneNumber, isAlertRequired,
+     *                             consigneeProvinceAbbreviation, alphanumericSenderReference,
+     *                             notes, serviceType
      * @param bool   $withLabel    Request PDF labels in response
      * @return array               ['success'=>bool, 'data'=>createResponse|null, 'error'=>string|null]
      */

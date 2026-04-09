@@ -57,21 +57,36 @@ if (!$result['success']) {
 
 $tracking = $result['data']['spedizione'] ?? $result['data'] ?? [];
 
-// Auto-update status to consegnata if BRT says delivered
+// Auto-update status based on BRT tracking data
 $eventi = $tracking['eventi']['evento'] ?? [];
-if (!isset($eventi[0])) { $eventi = [$eventi]; } // normalize single evento to array
-$isDelivered = false;
+if (!isset($eventi[0])) { $eventi = $eventi ? [$eventi] : []; }
+
+$isDelivered  = false;
+$isInTransit  = (count($eventi) > 0); // any event means picked up
+$currentStatus = $row['status'];
+
+// Detect delivery: event id 05 OR data_consegna_merce populated
 foreach ($eventi as $ev) {
-    // BRT event ID for "consegnato" is typically "05"
-    if (isset($ev['id']) && in_array($ev['id'], ['05', '5', '006'])) {
+    if (isset($ev['id']) && in_array($ev['id'], ['05', '5', '006'], true)) {
         $isDelivered = true;
         break;
     }
 }
-if ($isDelivered && $row['status'] !== 'consegnata') {
-    $db->prepare("UPDATE spedizioni SET status='consegnata', updated_at=NOW() WHERE id=?")->execute([$id]);
-    $user = currentUser();
-    logActivity($user['id'], 'auto_update', 'spedizione', $id, 'Status aggiornato a consegnata via BRT tracking');
+// Also check dati_consegna.data_consegna_merce
+$dataCons = $tracking['dati_consegna'] ?? [];
+if (!empty($dataCons['data_consegna_merce'])) {
+    $isDelivered = true;
 }
 
-echo json_encode(['success' => true, 'data' => $tracking, 'isDelivered' => $isDelivered]);
+$user = currentUser();
+
+if ($isDelivered && $currentStatus !== 'consegnata') {
+    $db->prepare("UPDATE spedizioni SET status='consegnata', updated_at=NOW() WHERE id=?")->execute([$id]);
+    logActivity($user['id'], 'auto_update', 'spedizione', $id, 'Status aggiornato a consegnata via BRT tracking');
+} elseif ($isInTransit && !$isDelivered && $currentStatus === 'da_spedire') {
+    // Package has been picked up by BRT — mark as spedita
+    $db->prepare("UPDATE spedizioni SET status='spedita', updated_at=NOW() WHERE id=?")->execute([$id]);
+    logActivity($user['id'], 'auto_update', 'spedizione', $id, 'Status aggiornato a spedita via BRT tracking (collo ritirato)');
+}
+
+echo json_encode(['success' => true, 'data' => $tracking, 'isDelivered' => $isDelivered, 'isInTransit' => $isInTransit]);

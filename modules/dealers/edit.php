@@ -25,15 +25,17 @@ $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { $errors[] = 'Token non valido. Riprova.'; }
-    $name    = trim($_POST['name'] ?? '');
-    $code    = strtoupper(trim($_POST['code'] ?? ''));
-    $email   = trim($_POST['email'] ?? '');
-    $phone   = trim($_POST['phone'] ?? '');
-    $address = trim($_POST['address'] ?? '');
-    $city    = trim($_POST['city'] ?? '');
-    $region  = trim($_POST['region'] ?? '');
-    $active  = isset($_POST['active']) ? 1 : 0;
-    $notes   = trim($_POST['notes'] ?? '');
+    $name     = trim($_POST['name'] ?? '');
+    $code     = strtoupper(trim($_POST['code'] ?? ''));
+    $email    = trim($_POST['email'] ?? '');
+    $phone    = trim($_POST['phone'] ?? '');
+    $address  = trim($_POST['address'] ?? '');
+    $city     = trim($_POST['city'] ?? '');
+    $zip      = trim($_POST['zip'] ?? '');
+    $province = strtoupper(trim($_POST['province'] ?? ''));
+    $region   = trim($_POST['region'] ?? '');
+    $active   = isset($_POST['active']) ? 1 : 0;
+    $notes    = trim($_POST['notes'] ?? '');
 
     if (!$name) $errors[] = 'Il nome è obbligatorio.';
     if (!$code) $errors[] = 'Il codice è obbligatorio.';
@@ -41,8 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         try {
-            $stmt = $db->prepare("UPDATE dealers SET name=?, code=?, email=?, phone=?, address=?, city=?, region=?, active=?, notes=?, updated_at=NOW() WHERE id=?");
-            $stmt->execute([$name, $code, $email, $phone, $address, $city, $region, $active, $notes, $id]);
+            $stmt = $db->prepare("UPDATE dealers SET name=?, code=?, email=?, phone=?, address=?, city=?, zip=?, province=?, region=?, active=?, notes=?, updated_at=NOW() WHERE id=?");
+            $stmt->execute([$name, $code, $email, $phone, $address, $city, $zip ?: null, $province ?: null, $region, $active, $notes, $id]);
             logActivity($user['id'], 'update', 'dealer', $id, "Modificato concessionario: $name");
             header('Location: ' . APP_URL . '/modules/dealers/view.php?id=' . $id . '&updated=1');
             exit;
@@ -99,11 +101,19 @@ include APP_ROOT . '/includes/header.php';
         <input type="text" name="address" class="form-control" value="<?= h($_POST['address'] ?? '') ?>">
     </div>
     <div class="row g-3 mb-3">
-        <div class="col-md-6">
+        <div class="col-md-5">
             <label class="form-label fw-semibold">Città</label>
             <input type="text" name="city" class="form-control" value="<?= h($_POST['city'] ?? '') ?>">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">CAP</label>
+            <input type="text" name="zip" class="form-control" maxlength="10" value="<?= h($_POST['zip'] ?? '') ?>" placeholder="Es. 20100">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold">Prov.</label>
+            <input type="text" name="province" class="form-control text-uppercase" maxlength="2" value="<?= h($_POST['province'] ?? '') ?>" placeholder="MI">
+        </div>
+        <div class="col-md-2">
             <label class="form-label fw-semibold">Regione</label>
             <input type="text" name="region" class="form-control" value="<?= h($_POST['region'] ?? '') ?>">
         </div>

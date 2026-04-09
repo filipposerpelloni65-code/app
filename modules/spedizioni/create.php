@@ -53,6 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $consigneeZip     = trim($_POST['brt_consignee_zip'] ?? '');
         $consigneeCity    = trim($_POST['brt_consignee_city'] ?? '');
         $consigneeProv    = trim($_POST['brt_consignee_province'] ?? '');
+        $consigneeContact = trim($_POST['brt_consignee_contact'] ?? '');
+        $consigneePhone   = trim($_POST['brt_consignee_phone'] ?? '');
+        $consigneeEmail   = trim($_POST['brt_consignee_email'] ?? '');
 
         if (!$consigneeName || !$consigneeAddress || !$consigneeZip || !$consigneeCity) {
             $errors[] = 'Compila i campi BRT: Ragione Sociale, Indirizzo, CAP e Città del destinatario.';
@@ -67,6 +70,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             if ($consigneeProv) {
                 $brtData['consigneeProvinceAbbreviation'] = strtoupper(mb_substr($consigneeProv, 0, 2));
+            }
+            if ($consigneeContact) {
+                $brtData['consigneeContactName'] = mb_substr($consigneeContact, 0, 35);
+            }
+            if ($consigneePhone) {
+                $brtData['consigneeTelephone'] = mb_substr($consigneePhone, 0, 20);
+            }
+            if ($consigneeEmail) {
+                $brtData['consigneeEMail']   = mb_substr($consigneeEmail, 0, 80);
+                $brtData['isAlertRequired']  = '1';
             }
             $brtConsigneeJson = json_encode($brtData, JSON_UNESCAPED_UNICODE);
             if (empty($corriere)) { $corriere = 'BRT'; }
@@ -166,6 +179,9 @@ include APP_ROOT . '/includes/header.php';
                     <select name="location_id" class="form-select" id="locationSelect">
                         <option value="">-- Nessuno --</option>
                     </select>
+                    <?php if ($brtAvailable): ?>
+                    <div class="form-text text-primary"><i class="bi bi-magic me-1"></i>Selezionando un punto vendita i dati BRT verranno pre-compilati automaticamente.</div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="col-12">
@@ -193,27 +209,40 @@ include APP_ROOT . '/includes/header.php';
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Ragione Sociale Destinatario <span class="text-danger">*</span></label>
-                                <input type="text" name="brt_consignee_name" class="form-control" maxlength="70" value="<?= h($_POST['brt_consignee_name'] ?? '') ?>" placeholder="Es. Mario Rossi S.r.l.">
+                                <input type="text" name="brt_consignee_name" id="brtName" class="form-control" maxlength="70" value="<?= h($_POST['brt_consignee_name'] ?? '') ?>" placeholder="Es. Mario Rossi S.r.l.">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Indirizzo <span class="text-danger">*</span></label>
-                                <input type="text" name="brt_consignee_address" class="form-control" maxlength="35" value="<?= h($_POST['brt_consignee_address'] ?? '') ?>" placeholder="Es. Via Roma 1">
+                                <input type="text" name="brt_consignee_address" id="brtAddress" class="form-control" maxlength="35" value="<?= h($_POST['brt_consignee_address'] ?? '') ?>" placeholder="Es. Via Roma 1">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">CAP <span class="text-danger">*</span></label>
-                                <input type="text" name="brt_consignee_zip" class="form-control" maxlength="9" value="<?= h($_POST['brt_consignee_zip'] ?? '') ?>" placeholder="Es. 20100">
+                                <input type="text" name="brt_consignee_zip" id="brtZip" class="form-control" maxlength="9" value="<?= h($_POST['brt_consignee_zip'] ?? '') ?>" placeholder="Es. 20100">
                             </div>
                             <div class="col-md-5">
                                 <label class="form-label fw-semibold">Città <span class="text-danger">*</span></label>
-                                <input type="text" name="brt_consignee_city" class="form-control" maxlength="35" value="<?= h($_POST['brt_consignee_city'] ?? '') ?>" placeholder="Es. MILANO">
+                                <input type="text" name="brt_consignee_city" id="brtCity" class="form-control" maxlength="35" value="<?= h($_POST['brt_consignee_city'] ?? '') ?>" placeholder="Es. MILANO">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold">Provincia</label>
-                                <input type="text" name="brt_consignee_province" class="form-control" maxlength="2" value="<?= h($_POST['brt_consignee_province'] ?? '') ?>" placeholder="MI">
+                                <input type="text" name="brt_consignee_province" id="brtProvince" class="form-control text-uppercase" maxlength="2" value="<?= h($_POST['brt_consignee_province'] ?? '') ?>" placeholder="MI">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Nome Referente</label>
+                                <input type="text" name="brt_consignee_contact" id="brtContact" class="form-control" maxlength="35" value="<?= h($_POST['brt_consignee_contact'] ?? '') ?>" placeholder="Es. Mario Rossi">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Telefono</label>
+                                <input type="text" name="brt_consignee_phone" id="brtPhone" class="form-control" maxlength="20" value="<?= h($_POST['brt_consignee_phone'] ?? '') ?>" placeholder="Es. 0212345678">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Email notifica <i class="bi bi-bell-fill text-info" title="BRT invierà notifica al destinatario"></i></label>
+                                <input type="email" name="brt_consignee_email" id="brtEmail" class="form-control" maxlength="80" value="<?= h($_POST['brt_consignee_email'] ?? '') ?>" placeholder="Es. destinatario@email.it">
+                                <div class="form-text">Se inserita, BRT notificherà il destinatario.</div>
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold">N° Colli</label>
-                                <input type="number" name="brt_num_parcels" class="form-control" min="1" max="85" value="<?= h($_POST['brt_num_parcels'] ?? '1') ?>">
+                                <input type="number" name="brt_num_parcels" class="form-control" min="1" max="30" value="<?= h($_POST['brt_num_parcels'] ?? '1') ?>">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">Peso (kg)</label>
@@ -237,19 +266,46 @@ include APP_ROOT . '/includes/header.php';
 $extraJs = '<script>
 $(document).ready(function(){
     window.appUrl = "' . APP_URL . '";
+
+    // Store location data for auto-fill
+    var locationData = {};
+
     $("#dealerSelect").on("change", function(){
         var did = $(this).val();
         var $loc = $("#locationSelect");
         $loc.html("<option value=\"\">-- Nessuno --</option>");
+        locationData = {};
         if (!did) return;
         $.getJSON(window.appUrl + "/api/parts.php?action=dealer_locations&dealer_id=" + did, function(data){
             if (data.success) {
                 $.each(data.data, function(i, l){
                     $loc.append("<option value=\""+l.id+"\">"+l.name+"</option>");
+                    locationData[l.id] = l;
                 });
             }
         });
     });
+
+    // Auto-fill BRT fields when location selected
+    $("#locationSelect").on("change", function(){
+        var lid = $(this).val();
+        if (!lid || !locationData[lid]) return;
+        var loc = locationData[lid];
+        if ($("#useBrt").is(":checked")) {
+            fillBrtFields(loc);
+        }
+    });
+
+    function fillBrtFields(loc) {
+        if (loc.name)           $("#brtName").val(loc.name.substring(0,70));
+        if (loc.address)        $("#brtAddress").val(loc.address.substring(0,35));
+        if (loc.zip)            $("#brtZip").val(loc.zip.substring(0,9));
+        if (loc.city)           $("#brtCity").val(loc.city.substring(0,35).toUpperCase());
+        if (loc.province)       $("#brtProvince").val(loc.province.substring(0,2).toUpperCase());
+        if (loc.contact_person) $("#brtContact").val(loc.contact_person.substring(0,35));
+        if (loc.phone)          $("#brtPhone").val(loc.phone.substring(0,20));
+        if (loc.email)          $("#brtEmail").val(loc.email.substring(0,80));
+    }
 
     // BRT toggle
     $("#useBrt").on("change", function(){
@@ -257,9 +313,14 @@ $(document).ready(function(){
             $("#brtFields").removeClass("d-none");
             var $req = $("#brtFields input[name=brt_consignee_name], #brtFields input[name=brt_consignee_address], #brtFields input[name=brt_consignee_zip], #brtFields input[name=brt_consignee_city]");
             $req.prop("required", true);
+            // Auto-fill from selected location if any
+            var lid = $("#locationSelect").val();
+            if (lid && locationData[lid]) {
+                fillBrtFields(locationData[lid]);
+            }
         } else {
             $("#brtFields").addClass("d-none");
-            $req.prop("required", false);
+            $("#brtFields input[name=brt_consignee_name], #brtFields input[name=brt_consignee_address], #brtFields input[name=brt_consignee_zip], #brtFields input[name=brt_consignee_city]").prop("required", false);
         }
     });
     // Set required on load if checked

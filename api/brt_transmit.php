@@ -84,6 +84,11 @@ foreach ($speds as $s) {
             'notes'                  => $note,
         ]);
 
+        // isAlertRequired is set only if email is present; ensure it carries through
+        if (!empty($consigneeData['consigneeEMail']) && !isset($createData['isAlertRequired'])) {
+            $createData['isAlertRequired'] = '1';
+        }
+
         $apiResult = $brt->createShipment($createData, true);
 
         if (!$apiResult['success']) {
