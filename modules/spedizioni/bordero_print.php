@@ -53,11 +53,14 @@ if ($ids) {
     $inList = implode(',', array_map('intval', $ids));
     $spedizioni = $db->query("
         SELECT s.*,
-            d.name  AS dealer_name,
+            d.name    AS dealer_name,
+            d.code    AS dealer_code,
             d.address AS dealer_address,
-            d.city  AS dealer_city,
-            d.region AS dealer_region,
-            dl.name AS location_name,
+            d.city    AS dealer_city,
+            d.region  AS dealer_region,
+            dl.name              AS location_name,
+            dl.codice_aams       AS location_codice_aams,
+            dl.id_punto_vendita  AS location_id_pv,
             sp.name AS part_name,
             t.title AS ticket_title
         FROM spedizioni s
@@ -102,14 +105,16 @@ $companyVat     = getSetting('company_vat', '');
     .header-logo { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
     .header-sub  { font-size: 0.8rem; color: #64748b; }
     .doc-title   { font-size: 1.2rem; font-weight: 700; border-bottom: 2px solid #1e293b; padding-bottom: 6px; margin-bottom: 12px; }
-    table.sped-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    table.sped-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
     table.sped-table th {
-        background: #1e293b; color: #fff; padding: 5px 8px; text-align: left;
-        font-size: 0.75rem; font-weight: 600;
+        background: #1e293b; color: #fff; padding: 5px 7px; text-align: left;
+        font-size: 0.7rem; font-weight: 600; white-space: nowrap;
     }
-    table.sped-table td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    table.sped-table td { padding: 4px 7px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
     table.sped-table tr:nth-child(even) td { background: #f8fafc; }
     .totals-row td { font-weight: 700; background: #e2e8f0 !important; border-top: 2px solid #94a3b8; }
+    .mono { font-family: 'Courier New', monospace; font-size: 0.7rem; }
+    .text-blue { color: #1d4ed8; }
     .sign-box { border: 1px solid #94a3b8; min-height: 70px; padding: 8px; border-radius: 4px; }
 
     /* Screen toolbar */
@@ -153,22 +158,28 @@ $companyVat     = getSetting('company_vat', '');
 
     <!-- Summary -->
     <div class="row mb-3 g-2">
-        <div class="col-4">
+        <div class="col-3">
             <div class="card border p-2 text-center">
-                <div style="font-size:1.5rem;font-weight:700;color:#3b82f6"><?= count($spedizioni) ?></div>
-                <div class="text-muted" style="font-size:.75rem">SPEDIZIONI</div>
+                <div style="font-size:1.4rem;font-weight:700;color:#3b82f6"><?= count($spedizioni) ?></div>
+                <div class="text-muted" style="font-size:.7rem">SPEDIZIONI</div>
             </div>
         </div>
-        <div class="col-4">
+        <div class="col-3">
             <div class="card border p-2 text-center">
-                <div style="font-size:1.5rem;font-weight:700;color:#f59e0b"><?= $totalColli ?></div>
-                <div class="text-muted" style="font-size:.75rem">COLLI TOTALI</div>
+                <div style="font-size:1.4rem;font-weight:700;color:#f59e0b"><?= $totalColli ?></div>
+                <div class="text-muted" style="font-size:.7rem">COLLI TOTALI</div>
             </div>
         </div>
-        <div class="col-4">
+        <div class="col-3">
             <div class="card border p-2 text-center">
-                <div style="font-size:1.5rem;font-weight:700;color:#10b981"><?= number_format($totalPeso, 2) ?> kg</div>
-                <div class="text-muted" style="font-size:.75rem">PESO TOTALE</div>
+                <div style="font-size:1.4rem;font-weight:700;color:#10b981"><?= number_format($totalPeso, 2) ?> kg</div>
+                <div class="text-muted" style="font-size:.7rem">PESO TOTALE</div>
+            </div>
+        </div>
+        <div class="col-3">
+            <div class="card border p-2 text-center">
+                <div style="font-size:1.4rem;font-weight:700;color:#8b5cf6"><?= count(array_filter($spedizioni, fn($s) => !empty($s['brt_parcel_id']))) ?></div>
+                <div class="text-muted" style="font-size:.7rem">TRASMESSE BRT</div>
             </div>
         </div>
     </div>
@@ -177,13 +188,16 @@ $companyVat     = getSetting('company_vat', '');
     <table class="sped-table mb-4">
         <thead>
             <tr>
-                <th style="width:40px">#</th>
+                <th style="width:28px">#</th>
                 <th>Destinatario</th>
+                <th>Cod. Cliente</th>
                 <th>Indirizzo</th>
-                <th>Tracking / Parcel ID</th>
-                <th style="width:50px;text-align:center">Colli</th>
-                <th style="width:70px;text-align:right">Peso</th>
-                <th>Riferimento</th>
+                <th>Tracking / Parcel ID BRT</th>
+                <th>N. Rif.</th>
+                <th style="width:44px;text-align:center">Colli</th>
+                <th style="width:60px;text-align:right">Peso</th>
+                <th>Riferimento Interno</th>
+                <th>Trasmessa</th>
             </tr>
         </thead>
         <tbody>
@@ -202,27 +216,67 @@ $companyVat     = getSetting('company_vat', '');
             $consignee = $s['dealer_name'] ?? ($s['location_name'] ?? '—');
         }
         if (!$cityInfo && $s['dealer_city']) {
-            $cityInfo = h($s['dealer_city']);
+            $cityInfo = $s['dealer_city'];
         }
-        $tracking = $s['tracking_number'] ?: ($s['brt_parcel_id'] ?: '—');
+
+        // Codice cliente (dealer code + location codes)
+        $codiceCliente = $s['dealer_code'] ?? '';
+        $aams = $s['location_codice_aams'] ?? '';
+        $idpv = $s['location_id_pv'] ?? '';
+
+        // BRT identifiers
+        $parcelId   = $s['brt_parcel_id'] ?? '';
+        $numericRef = $s['brt_numeric_ref'] ?? '';
+        $tracking   = $s['tracking_number'] ?? '';
+
+        // Best display tracking: prefer tracking_number, else parcel_id
+        $trackDisplay = $tracking ?: $parcelId;
+
         $ref = $s['ticket_id'] ? (getTicketPrefix().'-'.str_pad($s['ticket_id'],4,'0',STR_PAD_LEFT)) : '';
         if ($s['part_name']) { $ref .= ($ref ? ' / ' : '') . $s['part_name']; }
+
+        $transmittedAt = $s['transmitted_at'] ? formatDate($s['transmitted_at'], 'd/m/Y H:i') : '';
         ?>
         <tr>
             <td class="text-muted"><?= $i + 1 ?></td>
-            <td><strong><?= h($consignee) ?></strong></td>
-            <td class="text-muted"><?= h($address) ?><?php if ($address && $cityInfo): ?><br><?php endif; ?><?= h($cityInfo) ?></td>
-            <td class="font-monospace" style="font-size:.75rem"><?= h($tracking) ?></td>
+            <td>
+                <strong><?= h($consignee) ?></strong>
+                <?php if ($s['location_name'] && $s['location_name'] !== $consignee): ?>
+                <br><span class="text-muted"><?= h($s['location_name']) ?></span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if ($codiceCliente): ?><span class="mono text-blue"><?= h($codiceCliente) ?></span><?php endif; ?>
+                <?php if ($aams): ?><br><span class="text-muted" style="font-size:.65rem">AAMS: <?= h($aams) ?></span><?php endif; ?>
+                <?php if ($idpv): ?><br><span class="text-muted" style="font-size:.65rem">PV: <?= h($idpv) ?></span><?php endif; ?>
+                <?php if (!$codiceCliente && !$aams && !$idpv): ?>—<?php endif; ?>
+            </td>
+            <td class="text-muted">
+                <?= h($address) ?><?php if ($address && $cityInfo): ?><br><?php endif; ?><?= h($cityInfo) ?>
+            </td>
+            <td>
+                <?php if ($trackDisplay): ?>
+                <span class="mono"><?= h($trackDisplay) ?></span>
+                <?php if ($tracking && $parcelId && $tracking !== $parcelId): ?>
+                <br><span class="text-muted" style="font-size:.65rem">P.ID: <?= h($parcelId) ?></span>
+                <?php endif; ?>
+                <?php if ($numericRef): ?>
+                <br><span class="text-muted" style="font-size:.65rem">Rif: <?= h($numericRef) ?></span>
+                <?php endif; ?>
+                <?php else: ?><span class="text-muted">—</span><?php endif; ?>
+            </td>
+            <td class="mono" style="font-size:.7rem"><?= h($numericRef ?: '—') ?></td>
             <td style="text-align:center;font-weight:700"><?= (int)($s['num_colli'] ?? 1) ?></td>
             <td style="text-align:right"><?= number_format((float)($s['peso_kg'] ?? 1), 2) ?> kg</td>
-            <td class="text-muted" style="font-size:.75rem"><?= h($ref) ?></td>
+            <td class="text-muted" style="font-size:.7rem"><?= h($ref ?: '—') ?></td>
+            <td class="text-muted" style="font-size:.7rem;white-space:nowrap"><?= h($transmittedAt ?: '—') ?></td>
         </tr>
         <?php endforeach; ?>
         <tr class="totals-row">
-            <td colspan="4" class="text-end">TOTALI:</td>
+            <td colspan="6" class="text-end">TOTALI:</td>
             <td style="text-align:center"><?= $totalColli ?></td>
             <td style="text-align:right"><?= number_format($totalPeso, 2) ?> kg</td>
-            <td></td>
+            <td colspan="2"></td>
         </tr>
         </tbody>
     </table>
