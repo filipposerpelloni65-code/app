@@ -1,0 +1,65 @@
+name: "Copilot Setup Steps"
+
+on:
+    workflow_dispatch:
+    push:
+        paths:
+            - .github/workflows/copilot-setup-steps.yml
+    pull_request:
+        paths:
+            - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+    copilot-setup-steps:
+        runs-on: ubuntu-latest
+
+        permissions:
+            contents: read
+
+        services:
+            mysql:
+                image: mysql:8.0
+                env:
+                    MYSQL_ROOT_PASSWORD: root
+                    MYSQL_DATABASE: helpdesk_test
+                    MYSQL_USER: helpdesk
+                    MYSQL_PASSWORD: helpdesk
+                ports:
+                    - 3306:3306
+                options: >-
+                    --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up PHP 8.2
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: "8.2"
+                  extensions: pdo_mysql, curl, mbstring, json, intl
+                  ini-values: error_reporting=E_ALL, display_errors=On
+                  coverage: none
+
+            - name: Verify PHP installation
+              run: php --version && php -m | grep -E 'pdo_mysql|curl|mbstring|json|intl'
+
+            - name: Create test config.ini
+              run: |
+                  cat > config.ini << 'EOF'
+                  [database]
+                  host = 127.0.0.1
+                  port = 3306
+                  name = helpdesk_test
+                  user = helpdesk
+                  pass = helpdesk
+
+                  [app]
+                  name = HelpDesk Dev
+                  EOF
+
+            - name: Run PHP syntax check
+              run: find . -name "*.php" -not -path "./.git/*" -exec php -l {} \;
