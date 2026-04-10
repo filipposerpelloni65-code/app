@@ -257,9 +257,9 @@ $totalLabels = count($labelData);
         box-shadow: 0 6px 24px rgba(0,0,0,.3);
         display: grid;
         grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr 1fr;
+        grid-template-rows: repeat(4, 1fr);
         padding: 8mm;
-        gap: 4mm;
+        gap: 3mm;
         position: relative;
         overflow: hidden;
     }
@@ -412,12 +412,12 @@ $totalLabels = count($labelData);
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     // ── Constants ──────────────────────────────────────────────────────────
-    const LABELS_PER_PAGE = 4; // 2 columns × 2 rows on A4 — optimal for BRT A6 labels
-    // Cell inner dimensions (A4 208mm - 2*8mm padding - 1*4mm gap) / 2 cols × (297mm - 2*8mm - 4mm) / 2 rows
-    // ≈ 95mm × 134.5mm
-    const CELL_W_MM  = 95;
-    const CELL_H_MM  = 134.5;
-    const RENDER_DPI = 150; // dots per inch for render quality
+    const LABELS_PER_PAGE = 8; // 2 columns × 4 rows on A4
+    // Cell inner dimensions (A4 210mm - 2*8mm padding - 1*3mm gap) / 2 cols × (297mm - 2*8mm - 3*3mm gap) / 4 rows
+    // ≈ 95.5mm × 67.75mm
+    const CELL_W_MM  = 95.5;
+    const CELL_H_MM  = 67.75;
+    const RENDER_DPI = 200; // dots per inch for render quality
 
     // ── Label data from PHP ────────────────────────────────────────────────
     const LABELS = <?= json_encode($labelsForJs, JSON_UNESCAPED_UNICODE) ?>;
